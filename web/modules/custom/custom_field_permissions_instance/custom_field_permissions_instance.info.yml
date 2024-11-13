@@ -1,0 +1,11 @@
+name: 'Custom Field Permissions Instance'
+type: module
+description: 'Set field-level permissions to create, update or view fields within an instance context.'
+core_version_requirement: ^8 || ^9 || ^10
+package: Custom
+dependencies:
+  - drupal:user
+
+# Information added by Drupal.org packaging script on 2024-11-08
+version: '1.0.0'
+datestamp: 1731060773

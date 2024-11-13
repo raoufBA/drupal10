@@ -1,0 +1,4 @@
+field_permissions:
+  version: VERSION
+  js:
+    js/custom_field_permissions_instance.js: {}
