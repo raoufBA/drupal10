@@ -14,11 +14,11 @@ class CustomFieldInstancePermissionsService extends FieldPermissionsService {
   /**
    * {@inheritdoc}
    */
-  public function getGroupPermissionsByRole() {
+  public function getInstancePermissionsByRole() {
     /** @var \Drupal\group\Entity\GroupRoleInterface[] $roles */
-    $roles = $this->entityTypeManager->getStorage('group_role')->loadMultiple();
+    $roles = $this->entityTypeManager->getStorage('user_role')->loadMultiple();
     $field_field_permissions = [];
-    $field_permission_perm = $this->getAllGroupPermissions();
+    $field_permission_perm = $this->getAllInstancePermissions();
     foreach ($roles as $role_name => $role) {
       $role_permissions = $role->getPermissions();
       $field_field_permissions[$role_name] = [];
@@ -34,7 +34,7 @@ class CustomFieldInstancePermissionsService extends FieldPermissionsService {
   /**
    * {@inheritdoc}
    */
-  public function getAllGroupPermissions() {
+  public function getAllInstancePermissions() {
     $permissions = [];
     /** @var \Drupal\field\FieldStorageConfigInterface[] $fields */
     $fields = $this->entityTypeManager->getStorage('field_storage_config')->loadMultiple();

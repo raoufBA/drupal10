@@ -20,6 +20,7 @@ use Drupal\user\EntityOwnerInterface;
 use Drupal\user\RoleStorageInterface;
 use Drupal\user\UserInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Defines custom access for fields.
@@ -32,6 +33,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * )
  */
 class CustomInstanceAccess extends Base implements CustomPermissionsInterface, AdminFormSettingsInterface {
+
+ // File to get all instances.
+  const HOSTS_FILE = DRUPAL_ROOT.'/../config/hosts.yaml';
 
   /**
    * The permissions service.
@@ -98,7 +102,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
       if ($entity->isNew()) {
         // New group entity, check to see if account has required permission.
         if ($entity->hasPermission($operation . ' ' . $field_name, $account)) {
-          return TRUE;
+          return true;
         }
       }
       else {
@@ -138,7 +142,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
           else {
             // Anonymous account will not have membership but permission can be checked directly.
             if ($group->hasPermission($operation . ' ' . $field_name, $account)) {
-              return TRUE;
+              return true;
             }
           }
         }
@@ -152,18 +156,18 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
 
     foreach ($memberships as $membership) {
       if ($membership->hasPermission($operation . ' ' . $field_name)) {
-        return TRUE;
+        return true;
       }
       else {
         // User entities don't implement `EntityOwnerInterface`.
         if ($entity instanceof UserInterface) {
           if ($entity->id() == $account->id() && $account->hasPermission($operation . ' own ' . $field_name)) {
-            return TRUE;
+            return true;
           }
         }
         elseif ($entity instanceof EntityOwnerInterface) {
           if ($entity->getOwnerId() == $account->id() && $membership->hasPermission($operation . ' own ' . $field_name)) {
-            return TRUE;
+            return true;
           }
         }
       }
@@ -198,7 +202,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    */
   public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
     if ($form_state->hasValue('instance_perms')) {
-      $group_role_storage = \Drupal::entityTypeManager()->getStorage('group_role');
+      $group_role_storage = \Drupal::entityTypeManager()->getStorage('user_role');
 
       $custom_permissions = $form_state->getValue('instance_perms');
       /** @var \Drupal\group\Entity\GroupRoleInterface[] $roles */
@@ -253,49 +257,44 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    */
   protected function addPermissionsGrid(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
 
-    $group_types = \Drupal::entityTypeManager()->getStorage('group_type')->loadMultiple();
-    $group_role_storage = \Drupal::entityTypeManager()->getStorage('group_role');
-    /** @var \Drupal\group\Entity\GroupRoleInterface[] $roles */
-    $roles = $group_role_storage->loadMultiple();
+    /** @var \Drupal\user\RoleInterface[] $roles */
+    $roles = $role_storage->loadMultiple();
     $permissions = $this->getPermissions();
     $options = array_keys($permissions);
 
-    $test = $this->permissionsService->getGroupPermissionsByRole();
+    $test = $this->permissionsService->getInstancePermissionsByRole();
     $form['fpi_details'] = [
       '#type' => 'details',
       '#title' => $this->t('Instance types'),
-      '#open' => TRUE,
+      '#open' => true,
       '#id' => 'instance_perms',
     ];
 
-    $lables = ['Retail', 'Instit'];
-    $i = 0;
-    foreach ($group_types as $group_type) {
+    $instances = $this->getPrdInstances();
+
+    foreach ($instances as $instance) {
       // Make the permissions table for each group type into a separate panel.
-      $form['fpi_details'][$group_type->id()] = [
+      $form['fpi_details'][$instance] = [
         '#type' => 'details',
-        '#title' => $lables[$i],
-        '#open' => true,
+        '#title' => $instance,
+        '#open' => false,
       ];
-      $i++;
       // The permissions table.
-      $form['fpi_details'][$group_type->id()]['instance_perms'] = [
+      $form['fpi_details'][$instance]['instance_perms'] = [
         '#type' => 'table',
         '#header' => [$this->t('Permission')],
         '#attributes' => ['class' => ['permissions', 'js-permissions']],
-        '#sticky' => TRUE,
+        '#sticky' => true,
       ];
       foreach ($roles as $role) {
-      //  if ($role->getGroupTypeId() == $group_type->id() && $role->getScope() === PermissionScopeInterface::INSIDER_ID) {
-          $form['fpi_details'][$group_type->id()]['instance_perms']['#header'][] = [
+          $form['fpi_details'][$instance]['instance_perms']['#header'][] = [
             'data' => $role->label(),
             'class' => ['checkbox'],
           ];
-       // }
       }
 
       foreach ($permissions as $provider => $permission) {
-        $form['fpi_details'][$group_type->id()]['instance_perms'][$provider]['description'] = [
+        $form['fpi_details'][$instance]['instance_perms'][$provider]['description'] = [
           '#type' => 'inline_template',
           '#template' => '<div class="permission"><span class="title">{{ title }}</span>{% if description or warning %}<div class="description">{% if warning %}<em class="permission-warning">{{ warning }}</em> {% endif %}{{ description }}</div>{% endif %}</div>',
           '#context' => [
@@ -307,8 +306,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
 
         /** @var \Drupal\group\Entity\GroupRole $role */
         foreach ($roles as $name => $role) {
-         // if ($role->getGroupTypeId() == $group_type->id() && $role->getScope() === PermissionScopeInterface::INSIDER_ID) {
-            $form['fpi_details'][$group_type->id()]['instance_perms'][$provider][$name] = [
+            $form['fpi_details'][$instance]['instance_perms'][$provider][$name] = [
               '#title' => $name . ': ' . $permission["title"],
               '#title_display' => 'invisible',
               '#type' => 'checkbox',
@@ -318,16 +316,42 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
               ],
             ];
             if (!empty($test[$name]) && in_array($provider, $test[$name])) {
-              $form['fpi_details'][$group_type->id()]['instance_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
+              $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
             }
-        //  }
         }
       }
-
     }
-
     // Attach the field_permissions_group library.
     $form['#attached']['library'][] = 'custom_field_permissions_instance/field_permissions';
+  }
+
+  /**
+   * @return array
+   */
+  private function getPrdInstances(): array  {
+    $instances = [];
+
+    if (file_exists(self::HOSTS_FILE)) {
+      $donnees = Yaml::parseFile(self::HOSTS_FILE);
+
+      // Accéder aux données sous la clé 'prd'
+      if (isset($donnees['prd']) && is_array($donnees['prd'])) {
+        foreach ($donnees['prd'] as $key => $valeur) {
+          $instances[] = $key;
+        }
+        sort($instances);
+      }
+      else {
+        \Drupal::logger('mon_module')->error('La clé "prd" est introuvable ou n\'est pas un tableau dans hosts.yaml.');
+      }
+    } else {
+      \Drupal::logger('mon_module')->error(
+        'Le fichier YAML n\'a pas été trouvé au chemin : @chemin',
+        ['@chemin' => self::HOSTS_FILE]
+      );
+    }
+
+    return $instances;
   }
 
 }
