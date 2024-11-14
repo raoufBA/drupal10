@@ -28,7 +28,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *   id = "custom_instance",
  *   title = @Translation("Custom instance permissions"),
  *   description = @Translation("Define custom permissions for this field in a
- *   instance context."), weight = 50
+ *   instance context."), weight = 51
  * )
  */
 class CustomInstanceAccess extends Base implements CustomPermissionsInterface, AdminFormSettingsInterface {
@@ -188,18 +188,19 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
   public function buildAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
     $this->addPermissionsGrid($form, $form_state, $role_storage);
 
+
     // Only display the permissions matrix if this type is selected.
-//    $form['#attached']['library'][] = 'field_permissions/field_permissions';
+    $form['#attached']['library'][] = 'field_permissions/field_permissions';
   }
 
   /**
    * {@inheritdoc}
    */
   public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
-    if ($form_state->hasValue('group_perms')) {
+    if ($form_state->hasValue('instance_perms')) {
       $group_role_storage = \Drupal::entityTypeManager()->getStorage('group_role');
 
-      $custom_permissions = $form_state->getValue('group_perms');
+      $custom_permissions = $form_state->getValue('instance_perms');
       /** @var \Drupal\group\Entity\GroupRoleInterface[] $roles */
       $roles = [];
       foreach ($custom_permissions as $permission_name => $field_perm) {
@@ -260,40 +261,41 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     $options = array_keys($permissions);
 
     $test = $this->permissionsService->getGroupPermissionsByRole();
-
-    $form['fpg_details'] = [
+    $form['fpi_details'] = [
       '#type' => 'details',
-      '#title' => $this->t('Group types'),
+      '#title' => $this->t('Instance types'),
       '#open' => TRUE,
-      '#id' => 'group_perms',
+      '#id' => 'instance_perms',
     ];
 
+    $lables = ['Retail', 'Instit'];
+    $i = 0;
     foreach ($group_types as $group_type) {
       // Make the permissions table for each group type into a separate panel.
-      $form['fpg_details'][$group_type->id()] = [
+      $form['fpi_details'][$group_type->id()] = [
         '#type' => 'details',
-        '#title' => $group_type->label(),
-        '#open' => FALSE,
+        '#title' => $lables[$i],
+        '#open' => true,
       ];
-
+      $i++;
       // The permissions table.
-      $form['fpg_details'][$group_type->id()]['group_perms'] = [
+      $form['fpi_details'][$group_type->id()]['instance_perms'] = [
         '#type' => 'table',
         '#header' => [$this->t('Permission')],
         '#attributes' => ['class' => ['permissions', 'js-permissions']],
         '#sticky' => TRUE,
       ];
       foreach ($roles as $role) {
-        if ($role->getGroupTypeId() == $group_type->id() && $role->getScope() === PermissionScopeInterface::INSIDER_ID) {
-          $form['fpg_details'][$group_type->id()]['group_perms']['#header'][] = [
+      //  if ($role->getGroupTypeId() == $group_type->id() && $role->getScope() === PermissionScopeInterface::INSIDER_ID) {
+          $form['fpi_details'][$group_type->id()]['instance_perms']['#header'][] = [
             'data' => $role->label(),
             'class' => ['checkbox'],
           ];
-        }
+       // }
       }
 
       foreach ($permissions as $provider => $permission) {
-        $form['fpg_details'][$group_type->id()]['group_perms'][$provider]['description'] = [
+        $form['fpi_details'][$group_type->id()]['instance_perms'][$provider]['description'] = [
           '#type' => 'inline_template',
           '#template' => '<div class="permission"><span class="title">{{ title }}</span>{% if description or warning %}<div class="description">{% if warning %}<em class="permission-warning">{{ warning }}</em> {% endif %}{{ description }}</div>{% endif %}</div>',
           '#context' => [
@@ -305,8 +307,8 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
 
         /** @var \Drupal\group\Entity\GroupRole $role */
         foreach ($roles as $name => $role) {
-          if ($role->getGroupTypeId() == $group_type->id() && $role->getScope() === PermissionScopeInterface::INSIDER_ID) {
-            $form['fpg_details'][$group_type->id()]['group_perms'][$provider][$name] = [
+         // if ($role->getGroupTypeId() == $group_type->id() && $role->getScope() === PermissionScopeInterface::INSIDER_ID) {
+            $form['fpi_details'][$group_type->id()]['instance_perms'][$provider][$name] = [
               '#title' => $name . ': ' . $permission["title"],
               '#title_display' => 'invisible',
               '#type' => 'checkbox',
@@ -316,14 +318,13 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
               ],
             ];
             if (!empty($test[$name]) && in_array($provider, $test[$name])) {
-              $form['fpg_details'][$group_type->id()]['group_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
+              $form['fpi_details'][$group_type->id()]['instance_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
             }
-          }
+        //  }
         }
       }
 
     }
-    dump($form);
 
     // Attach the field_permissions_group library.
     $form['#attached']['library'][] = 'custom_field_permissions_instance/field_permissions';

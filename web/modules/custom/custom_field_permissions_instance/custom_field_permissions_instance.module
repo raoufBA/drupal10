@@ -29,9 +29,9 @@ function custom_field_permissions_instance_form_field_config_edit_form_alter(&$f
 $group_type = \Drupal::service('custom_field_permissions_instance.current_instance_type')->getGroupTypeFromRoute();
 if (!$group_type) {
 // Remove the group field permissions option
-unset($form['field']['field_permissions']['type']['#options']['custom_group']);
+unset($form['field']['field_permissions']['type']['#options']['custom_instance']);
 // Remove the group permissions matrix.
-unset($form['group_perms']);
+unset($form['instance_perms']);
 }
 
 }
