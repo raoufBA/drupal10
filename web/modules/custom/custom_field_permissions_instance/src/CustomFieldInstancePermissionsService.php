@@ -51,4 +51,8 @@ class CustomFieldInstancePermissionsService extends FieldPermissionsService {
     return $permissions;
   }
 
+  public function getRoles(){
+    return $this->entityTypeManager->getStorage('user_role')->loadMultiple();
+  }
+
 }

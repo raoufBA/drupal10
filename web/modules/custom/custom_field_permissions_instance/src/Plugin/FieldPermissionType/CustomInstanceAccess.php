@@ -2,6 +2,8 @@
 
 namespace Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType;
 
+use Drupal;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -201,30 +203,33 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    * {@inheritdoc}
    */
   public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
-    if ($form_state->hasValue('instance_perms')) {
-      $group_role_storage = \Drupal::entityTypeManager()->getStorage('user_role');
-
-      $custom_permissions = $form_state->getValue('instance_perms');
-      /** @var \Drupal\group\Entity\GroupRoleInterface[] $roles */
-      $roles = [];
-      foreach ($custom_permissions as $permission_name => $field_perm) {
-        foreach ($field_perm as $role_name => $role_permission) {
-          if (empty($roles[$role_name])) {
-            $roles[$role_name] = $group_role_storage->load($role_name);
-          }
-          // If using this plugin, set permissions to the value submitted in the
-          // form, else remove all permissions as they will no longer exist.
-          $role_permission = $form_state->getValue('type') === $this->getPluginId() ? $role_permission : FALSE;
-          if ($role_permission) {
-            $roles[$role_name]->set('permissions', array_unique(array_merge($roles[$role_name]->getPermissions(), [$permission_name])));
-          }
-          else {
-            $roles[$role_name]->set('permissions',  array_diff($roles[$role_name]->getPermissions(), [$permission_name]));
-          }
-        }
+    $this_plugin_applies = $form_state->getValue('type') === $this->getPluginId();
+    $custom_permissions = $form_state->getValue('instance_perms');
+$all_permissions_by_role = $this->getInstancePermissionsByRole();
+//    $custom_permissions = $this->transposeArray($custom_permissions);
+    $roles = $role_storage->loadMultiple();
+    unset($roles['administrator']);
+    foreach ($roles as $role) {
+      if(!array_key_exists($role->id(), $custom_permissions)){
+        continue;
       }
-      // Save all roles.
-      foreach ($roles as $role) {
+      $keys =  $all_permissions_by_role[$role->id()];
+
+      $permissions = $role->getPermissions();
+
+      $removed = array_values(array_intersect($permissions, $keys));
+      $added = $this_plugin_applies ? array_keys(array_filter($custom_permissions[$role->id()])) : [];
+
+      // Permissions in role object are sorted on save. Permissions on form are
+      // not in same order (the 'any' and 'own' items are flipped) but need to
+      // be as array equality tests keys and values. So sort the added items.
+      if ($removed != $added) {
+        // Rule #1 Do NOT save something that is not changed.
+        // Like field storage, delete existing items then add current items.
+        $permissions = array_diff($permissions, $removed);
+        $permissions = array_merge($permissions, $added);
+
+        $role->set('permissions', $permissions);
         $role->trustData()->save();
       }
     }
@@ -262,7 +267,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     $permissions = $this->getPermissions();
     $options = array_keys($permissions);
 
-    $test = $this->permissionsService->getInstancePermissionsByRole();
+    $test = $this->permissionsService->getPermissionsByRole();
     $form['fpi_details'] = [
       '#type' => 'details',
       '#title' => $this->t('Instance types'),
@@ -314,10 +319,18 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
               '#wrapper_attributes' => [
                 'class' => ['checkbox'],
               ],
+              '#name' => "instance_perms[$name][$instance $provider]",
+              '#default_value' => 0,
+              //instance_perms[create field_color][content_editor]
             ];
-            if (!empty($test[$name]) && in_array($provider, $test[$name])) {
-              $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
-            }
+//            if (!empty($test[$name]) && in_array($provider, $test[$name])) {
+//              $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
+//            }
+
+          if ($role->isAdmin()) {
+            $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#disabled'] = TRUE;
+            $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#default_value'] = TRUE;
+          }
         }
       }
     }
@@ -326,9 +339,40 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public function getInstancePermissionsByRole() {
+    $field_field_permissions = [];
+    $instances = $this->getPrdInstances();
+    $permissions = $this->getPermissions();
+    $roles = $this->fieldPermissionsService->getRoles();
+    // Delete administrator role.
+    unset($roles['administrator']);
+    foreach ($roles as $name => $role) {
+    foreach ($instances as $instance) {
+        foreach ($permissions as $provider => $permission) {
+          $field_field_permissions[$name][] =  "$instance $provider";
+        }
+      }
+    }
+    return $field_field_permissions;
+  }
+
+  /**
    * @return array
    */
-  private function getPrdInstances(): array  {
+  public function getPrdInstances(): array {
+    // Access the cache service
+    $cache = Drupal::cache();
+    // Define a unique cache key to store and retrieve this data
+    $cache_key = 'custom_field_permissions_instance';
+
+    // Retrieve the cached data using the same cache key
+    if ($cached_data = $cache->get($cache_key)) {
+      // Cache data was found; retrieve it from the 'data' property
+      return $cached_data->data;
+    }
+
     $instances = [];
 
     if (file_exists(self::HOSTS_FILE)) {
@@ -339,19 +383,23 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
         foreach ($donnees['prd'] as $key => $valeur) {
           $instances[] = $key;
         }
-        sort($instances);
-      }
-      else {
-        \Drupal::logger('mon_module')->error('La clé "prd" est introuvable ou n\'est pas un tableau dans hosts.yaml.');
+        if ($instances) {
+          sort($instances);
+          // Store the data in the cache
+          $cache->set($cache_key, $instances, Cache::PERMANENT);
+        }
+      } else {
+        Drupal::logger('mon_module')->error('La clé "prd" est introuvable ou n\'est pas un tableau dans hosts.yaml.');
       }
     } else {
-      \Drupal::logger('mon_module')->error(
-        'Le fichier YAML n\'a pas été trouvé au chemin : @chemin',
-        ['@chemin' => self::HOSTS_FILE]
+      Drupal::logger('mon_module')->error(
+        'Le fichier YAML n\'a pas été trouvé au chemin : @chemin', ['@chemin' => self::HOSTS_FILE]
       );
     }
 
     return $instances;
   }
+
+
 
 }
