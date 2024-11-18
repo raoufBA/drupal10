@@ -1,0 +1,14 @@
+uuid: b2ff8b17-1b24-4a15-81fd-b49aaf2a91a5
+langcode: en
+status: true
+dependencies: {  }
+_core:
+  default_config_hash: vymHlgJy26BuI5GGj9-IXjwR3dRC5C0tij4BpWJnoqw
+id: feedback
+label: 'Website feedback'
+recipients:
+  - raouf.belanes@gmail.com
+reply: ''
+weight: 0
+message: 'Your message has been sent.'
+redirect: ''

@@ -1,0 +1,27 @@
+uuid: c0cbc093-081d-4b5b-b8e0-627b9176bf59
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+    - options
+id: node.field_color
+field_name: field_color
+entity_type: node
+type: list_string
+settings:
+  allowed_values:
+    -
+      value: primary
+      label: primary
+    -
+      value: secondary
+      label: secondary
+  allowed_values_function: ''
+module: options
+locked: false
+cardinality: 1
+translatable: true
+indexes: {  }
+persist_with_no_fields: false
+custom_storage: false
