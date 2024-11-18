@@ -65,10 +65,11 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    * @param \Drupal\group\Plugin\Group\Relation\GroupRelationTypeManagerInterface $group_content_enabler_manager
    *   The group_content enabler manager.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage, FieldPermissionsServiceInterface $permissions_service, GroupRelationTypeManagerInterface $group_content_enabler_manager) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition,
+    FieldStorageConfigInterface $field_storage,
+    FieldPermissionsServiceInterface $permissions_service) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $field_storage);
     $this->permissionsService = $permissions_service;
-    $this->groupContentEnablerManager = $group_content_enabler_manager;
   }
 
   /**
@@ -81,7 +82,6 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
       $plugin_definition,
       $field_storage,
       $container->get('field_permissions.permissions_service'),
-      $container->get('group_relation_type.manager')
     );
   }
 
@@ -91,93 +91,37 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
   public function hasFieldAccess($operation, EntityInterface $entity, AccountInterface $account) {
     assert(in_array($operation, ["edit", "view"]), 'The operation is either "edit" or "view", "' . $operation . '" given instead.');
 
-    // Change 'edit' operation to 'create' if required.
-    if ($operation == 'edit' && $entity->isNew()) {
-      $operation = 'create';
-    }
-
-    $memberships = [];
-
     $field_name = $this->fieldStorage->getName();
-
-    if ($entity instanceof GroupInterface) {
-      if ($entity->isNew()) {
-        // New group entity, check to see if account has required permission.
-        if ($entity->hasPermission($operation . ' ' . $field_name, $account)) {
-          return true;
-        }
-      }
-      else {
-        // Load group membership for this account, if any.
-        if ($membership = $entity->getMember($account)) {
-          $memberships[] = $membership;
-        }
-      }
+    if ($operation === 'edit' && $entity->isNew()) {
+      return $account->hasPermission('create ' . $field_name);
     }
-    elseif ($entity instanceof GroupRelationshipInterface) {
-      // Load group membership for this account, if any.
-      if ($membership = $entity->getGroup()->getMember($account)) {
-        $memberships[] = $membership;
-      }
-    }
-    elseif ($entity instanceof ContentEntityInterface) {
-      // Note that a given content entity may belong to more than one group, so need to check them all.
-      $plugin_id = 'group_' . $entity->getEntityTypeId();
-      $plugin_id .= $entity->bundle() ? ':' . $entity->bundle() : '';
-
-      $plugin_ids = $this->groupContentEnablerManager->getPluginGroupRelationshipTypeMap();
-      if (isset($plugin_ids[$plugin_id])) {
-
-        $ids = \Drupal::entityQuery('group_relationship')
-          ->accessCheck(FALSE)
-          ->condition('type', $plugin_ids[$plugin_id], 'IN')
-          ->condition('entity_id', $entity->id())
-          ->execute();
-
-        $relations = GroupRelationship::loadMultiple($ids);
-
-        foreach ($relations as $relation) {
-          $group = $relation->getGroup();
-          if ($group_membership = $group->getMember($account)) {
-            $memberships[] = $group_membership;
-          }
-          else {
-            // Anonymous account will not have membership but permission can be checked directly.
-            if ($group->hasPermission($operation . ' ' . $field_name, $account)) {
-              return true;
-            }
-          }
-        }
-      }
-
+    if ($account->hasPermission($operation . ' ' . $field_name)) {
+      return TRUE;
     }
     else {
-      // Account is not associated with group or group_content or content entity.
-      return FALSE;
-    }
-
-    foreach ($memberships as $membership) {
-      if ($membership->hasPermission($operation . ' ' . $field_name)) {
-        return true;
+      // User entities don't implement `EntityOwnerInterface`.
+      if ($entity instanceof UserInterface) {
+        return $entity->id() == $account->id() && $account->hasPermission($operation . ' own ' . $field_name);
       }
-      else {
-        // User entities don't implement `EntityOwnerInterface`.
-        if ($entity instanceof UserInterface) {
-          if ($entity->id() == $account->id() && $account->hasPermission($operation . ' own ' . $field_name)) {
-            return true;
-          }
-        }
-        elseif ($entity instanceof EntityOwnerInterface) {
-          if ($entity->getOwnerId() == $account->id() && $membership->hasPermission($operation . ' own ' . $field_name)) {
-            return true;
-          }
-        }
+      elseif ($entity instanceof EntityOwnerInterface) {
+        return $entity->getOwnerId() === $account->id() && $account->hasPermission($operation . ' own ' . $field_name);
       }
     }
 
     // Default to deny since access can be explicitly granted (edit field_name),
     // even if this entity type doesn't implement the EntityOwnerInterface.
     return FALSE;
+  }
+
+
+  protected function transposeArray(array $original) {
+    $transpose = [];
+    foreach ($original as $row => $columns) {
+      foreach ($columns as $column => $value) {
+        $transpose[$column][$row] = $value;
+      }
+    }
+    return $transpose;
   }
 
   /**
@@ -202,53 +146,68 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
   /**
    * {@inheritdoc}
    */
-  public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
-    $this_plugin_applies = $form_state->getValue('type') === $this->getPluginId();
-    $custom_permissions = $form_state->getValue('instance_perms');
-$all_permissions_by_role = $this->getInstancePermissionsByRole();
-//    $custom_permissions = $this->transposeArray($custom_permissions);
-    $roles = $role_storage->loadMultiple();
-    unset($roles['administrator']);
-    foreach ($roles as $role) {
-      if(!array_key_exists($role->id(), $custom_permissions)){
-        continue;
-      }
-      $keys =  $all_permissions_by_role[$role->id()];
-
-      $permissions = $role->getPermissions();
-
-      $removed = array_values(array_intersect($permissions, $keys));
-      $added = $this_plugin_applies ? array_keys(array_filter($custom_permissions[$role->id()])) : [];
-
-      // Permissions in role object are sorted on save. Permissions on form are
-      // not in same order (the 'any' and 'own' items are flipped) but need to
-      // be as array equality tests keys and values. So sort the added items.
-      if ($removed != $added) {
-        // Rule #1 Do NOT save something that is not changed.
-        // Like field storage, delete existing items then add current items.
-        $permissions = array_diff($permissions, $removed);
-        $permissions = array_merge($permissions, $added);
-
-        $role->set('permissions', $permissions);
-        $role->trustData()->save();
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function getPermissions() {
     $permissions = [];
     $field_name = $this->fieldStorage->getName();
     $permission_list = $this->permissionsService->getList($field_name);
     $perms_name = array_keys($permission_list);
+    $instances = $this->getPrdInstances();
     foreach ($perms_name as $perm_name) {
-      $name = $perm_name . ' ' . $field_name;
+      $name = $perm_name.' '.$field_name;
       $permissions[$name] = $permission_list[$perm_name];
+      foreach ($instances as $instance) {
+        $name = $instance.' '. $perm_name.' '.$field_name;
+        $permissions[$name] = $permission_list[$perm_name];
+      }
     }
+
     return $permissions;
   }
+
+
+  /**
+   * {@inheritdoc}
+   */
+  public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
+
+    if ($form_state->hasValue('instance_perms')) {
+      $user_role_storage = $role_storage->loadMultiple();
+
+      $custom_permissions = $form_state->getValue('instance_perms');
+
+      /** @var \Drupal\group\Entity\UserRoleInterface[] $roles */
+      $roles = [];
+      foreach ($custom_permissions as $permission_name => $field_perm) {
+        foreach ($field_perm as $role_name => $role_permission) {
+          if (empty($roles[$role_name])) {
+            $roles[$role_name] = $user_role_storage[$role_name];
+          }
+          // If using this plugin, set permissions to the value submitted in the
+          // form, else remove all permissions as they will no longer exist.
+          $role_permission = $form_state->getValue('type') === $this->getPluginId() ? $role_permission : FALSE;
+          if ($role_permission) {
+            $roles[$role_name]->grantPermission($permission_name);
+          }
+          else {
+            $roles[$role_name]->revokePermission($permission_name);
+          }
+        }
+      }
+//      dump($roles);
+//      exit();
+
+//      exit();
+      // Save all roles.
+     foreach ($roles as $role) {
+        $role->trustData()->save();
+      }
+    }
+  }
+
+
+
+
+
 
   /**
    * Attach a permissions grid to the field edit form.
@@ -265,9 +224,14 @@ $all_permissions_by_role = $this->getInstancePermissionsByRole();
     /** @var \Drupal\user\RoleInterface[] $roles */
     $roles = $role_storage->loadMultiple();
     $permissions = $this->getPermissions();
+//    dump($permissions);/
+//    exit();
+
     $options = array_keys($permissions);
 
     $test = $this->permissionsService->getPermissionsByRole();
+
+
     $form['fpi_details'] = [
       '#type' => 'details',
       '#title' => $this->t('Instance types'),
@@ -278,6 +242,7 @@ $all_permissions_by_role = $this->getInstancePermissionsByRole();
     $instances = $this->getPrdInstances();
 
     foreach ($instances as $instance) {
+//      $options = array_keys($permissions);
       // Make the permissions table for each group type into a separate panel.
       $form['fpi_details'][$instance] = [
         '#type' => 'details',
@@ -288,7 +253,7 @@ $all_permissions_by_role = $this->getInstancePermissionsByRole();
       $form['fpi_details'][$instance]['instance_perms'] = [
         '#type' => 'table',
         '#header' => [$this->t('Permission')],
-        '#attributes' => ['class' => ['permissions', 'js-permissions']],
+       // '#attributes' => ['class' => ['permissions', 'js-permissions']],
         '#sticky' => true,
       ];
       foreach ($roles as $role) {
@@ -297,8 +262,12 @@ $all_permissions_by_role = $this->getInstancePermissionsByRole();
             'class' => ['checkbox'],
           ];
       }
+      $permission_instance = array_filter($permissions , function ($permission) use ($instance){
+        if(str_contains($permission, $instance)) return $permission;
+      },ARRAY_FILTER_USE_KEY);
 
-      foreach ($permissions as $provider => $permission) {
+
+      foreach ($permission_instance as $provider => $permission) {
         $form['fpi_details'][$instance]['instance_perms'][$provider]['description'] = [
           '#type' => 'inline_template',
           '#template' => '<div class="permission"><span class="title">{{ title }}</span>{% if description or warning %}<div class="description">{% if warning %}<em class="permission-warning">{{ warning }}</em> {% endif %}{{ description }}</div>{% endif %}</div>',
@@ -309,7 +278,6 @@ $all_permissions_by_role = $this->getInstancePermissionsByRole();
 
         $options[$provider] = '';
 
-        /** @var \Drupal\group\Entity\GroupRole $role */
         foreach ($roles as $name => $role) {
             $form['fpi_details'][$instance]['instance_perms'][$provider][$name] = [
               '#title' => $name . ': ' . $permission["title"],
@@ -319,13 +287,10 @@ $all_permissions_by_role = $this->getInstancePermissionsByRole();
               '#wrapper_attributes' => [
                 'class' => ['checkbox'],
               ],
-              '#name' => "instance_perms[$name][$instance $provider]",
-              '#default_value' => 0,
-              //instance_perms[create field_color][content_editor]
             ];
-//            if (!empty($test[$name]) && in_array($provider, $test[$name])) {
-//              $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
-//            }
+            if (!empty($test[$name]) && in_array($provider, $test[$name])) {
+              $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
+            }
 
           if ($role->isAdmin()) {
             $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#disabled'] = TRUE;
@@ -347,7 +312,6 @@ $all_permissions_by_role = $this->getInstancePermissionsByRole();
     $permissions = $this->getPermissions();
     $roles = $this->fieldPermissionsService->getRoles();
     // Delete administrator role.
-    unset($roles['administrator']);
     foreach ($roles as $name => $role) {
     foreach ($instances as $instance) {
         foreach ($permissions as $provider => $permission) {

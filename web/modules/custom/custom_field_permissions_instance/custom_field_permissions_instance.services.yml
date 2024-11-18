@@ -1,9 +1,9 @@
 services:
-  custom_field_permissions_instance.current_instance_type:
-    class: Drupal\custom_field_permissions_instance\CurrentInstanceType
-    arguments: ['@current_route_match', '@entity_type.manager']
+#  custom_field_permissions_instance.current_instance_type:
+#    class: Drupal\custom_field_permissions_instance\CurrentInstanceType
+#    arguments: ['@current_route_match', '@entity_type.manager']
   custom_field_permissions_instance.permissions_service:
-    class: Drupal\custom_field_permissions_instance\CustomFieldInstancePermissionsService
+    class: Drupal\custom_field_permissions_instance\FieldPermissionsInstanceService
     public: false
     decorates: field_permissions.permissions_service
     decoration_priority: 1

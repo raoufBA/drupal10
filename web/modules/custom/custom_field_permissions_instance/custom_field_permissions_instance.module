@@ -25,13 +25,13 @@ function custom_field_permissions_instance_form_field_config_edit_form_alter(&$f
 
 // Need to adjust the options for the field permissions plugin depending on
 // whether the field is attached to a group or group entity.
-/** @var \Drupal\group\Entity\GroupType $group_type */
-$group_type = \Drupal::service('custom_field_permissions_instance.current_instance_type')->getGroupTypeFromRoute();
-if (!$group_type) {
-// Remove the group field permissions option
-unset($form['field']['field_permissions']['type']['#options']['custom_instance']);
-// Remove the group permissions matrix.
-unset($form['instance_perms']);
-}
+///** @var \Drupal\group\Entity\GroupType $group_type */
+//$group_type = \Drupal::service('custom_field_permissions_instance.current_instance_type')->getGroupTypeFromRoute();
+//if (!$group_type) {
+//// Remove the group field permissions option
+//unset($form['field']['field_permissions']['type']['#options']['custom_instance']);
+//// Remove the group permissions matrix.
+//unset($form['instance_perms']);
+//}
 
 }
