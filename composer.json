@@ -21,7 +21,7 @@
         "drupal/core-composer-scaffold": "10.3.0",
         "drupal/core-project-message": "10.3.0",
         "drupal/core-recommended": "10.3.0",
-        "drupal/field_permissions_group": "^1.0",
+        "drupal/field_permissions": "^1.4",
         "drupal/focal_point": "^2.1",
         "drupal/masquerade": "^2.0",
         "drupal/metatag": "^2.0",

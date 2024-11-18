@@ -1,11 +1,18 @@
 uuid: 945252e5-440a-4d87-86c2-eeaae5385d15
 langcode: en
 status: true
-dependencies: {  }
+dependencies:
+  module:
+    - field_permissions
 _core:
   default_config_hash: OeKGIkmZA_c-t6QLH81WNQx8gDCc1MRmxaTuQgxBByU
 id: administrator
 label: Administrator
 weight: 3
 is_admin: true
-permissions: {  }
+permissions:
+  - 'create field_color'
+  - 'edit field_color'
+  - 'edit own field_color'
+  - 'view field_color'
+  - 'view own field_color'

@@ -17,15 +17,20 @@ module:
   dynamic_page_cache: 0
   editor: 0
   field: 0
+  field_permissions: 0
   field_ui: 0
   file: 0
   filter: 0
   help: 0
   history: 0
   image: 0
+  jquery_ui: 0
+  jquery_ui_autocomplete: 0
+  jquery_ui_menu: 0
   link: 0
   menu_link_content: 0
   menu_ui: 0
+  module_filter: 0
   mysql: 0
   node: 0
   options: 0
