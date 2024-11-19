@@ -1,0 +1,11 @@
+--- a/field_permissions.module	2024-11-19 01:15:31.333854714 +0100
++++ b/field_permissions.module	2024-11-18 09:47:33.088925072 +0100
+@@ -125,7 +125,7 @@
+
+   $user_role_storage = \Drupal::service('entity_type.manager')->getStorage('user_role');
+   // Allow each plugin to add to or alter the form.
+-  foreach ($plugins as $plugin) {
++  foreach ($plugins as $id => $plugin) {
+     if ($plugin instanceof AdminFormSettingsInterface) {
+       // Allow plugin to add to the form.
+       $form['field_permissions'][$id] = [
