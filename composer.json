@@ -104,6 +104,9 @@
             ]
         },
         "patches": {
+            "drupal/field_permissions": {
+                "Fix load plugins for drupal/field_permissions": "patches/field_permissions_fix.patch"
+            }
         }
     }
 }

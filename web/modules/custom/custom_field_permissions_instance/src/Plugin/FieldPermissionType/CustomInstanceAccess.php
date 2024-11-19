@@ -92,19 +92,21 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     assert(in_array($operation, ["edit", "view"]), 'The operation is either "edit" or "view", "' . $operation . '" given instead.');
 
     $field_name = $this->fieldStorage->getName();
+    $current_instance = 'amtt';
     if ($operation === 'edit' && $entity->isNew()) {
-      return $account->hasPermission('create ' . $field_name);
+      return $account->hasPermission($current_instance.' create ' . $field_name);
     }
-    if ($account->hasPermission($operation . ' ' . $field_name)) {
+
+    if ($account->hasPermission($current_instance.' '.$operation . ' ' . $field_name)) {
       return TRUE;
     }
     else {
       // User entities don't implement `EntityOwnerInterface`.
       if ($entity instanceof UserInterface) {
-        return $entity->id() == $account->id() && $account->hasPermission($operation . ' own ' . $field_name);
+        return $entity->id() == $account->id() && $account->hasPermission($current_instance.' '.$operation . ' own ' . $field_name);
       }
       elseif ($entity instanceof EntityOwnerInterface) {
-        return $entity->getOwnerId() === $account->id() && $account->hasPermission($operation . ' own ' . $field_name);
+        return $entity->getOwnerId() === $account->id() && $account->hasPermission($current_instance.' '.$operation . ' own ' . $field_name);
       }
     }
 
@@ -129,6 +131,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    */
   public function hasFieldViewAccessForEveryEntity(AccountInterface $account) {
     $field_name = $this->fieldStorage->getName();
+    $current_instance = 'amtt';
     return $account->hasPermission('view ' . $field_name);
   }
 
@@ -170,38 +173,67 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    */
   public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
 
-    if ($form_state->hasValue('instance_perms')) {
-      $user_role_storage = $role_storage->loadMultiple();
+    $this_plugin_applies = $form_state->getValue('type') === $this->getPluginId();
+    $custom_permissions = $form_state->getValue('instance_perms');
 
-      $custom_permissions = $form_state->getValue('instance_perms');
-
-      /** @var \Drupal\group\Entity\UserRoleInterface[] $roles */
-      $roles = [];
-      foreach ($custom_permissions as $permission_name => $field_perm) {
-        foreach ($field_perm as $role_name => $role_permission) {
-          if (empty($roles[$role_name])) {
-            $roles[$role_name] = $user_role_storage[$role_name];
-          }
-          // If using this plugin, set permissions to the value submitted in the
-          // form, else remove all permissions as they will no longer exist.
-          $role_permission = $form_state->getValue('type') === $this->getPluginId() ? $role_permission : FALSE;
-          if ($role_permission) {
-            $roles[$role_name]->grantPermission($permission_name);
-          }
-          else {
-            $roles[$role_name]->revokePermission($permission_name);
-          }
-        }
-      }
-//      dump($roles);
-//      exit();
-
-//      exit();
-      // Save all roles.
-     foreach ($roles as $role) {
-        $role->trustData()->save();
+//    dump('permission', $custom_permissions);
+    $keys = array_keys($custom_permissions);
+    $custom_permissions = $this->transposeArray($custom_permissions);
+    foreach ($role_storage->loadMultiple() as $role) {
+      $permissions = $role->getPermissions();
+      $removed = array_values(array_intersect($permissions, $keys));
+      $added = $this_plugin_applies ? array_keys(array_filter($custom_permissions[$role->id()])) : [];
+      // Permissions in role object are sorted on save. Permissions on form are
+      // not in same order (the 'any' and 'own' items are flipped) but need to
+      // be as array equality tests keys and values. So sort the added items.
+      sort($added);
+      if ($removed != $added) {
+        // Rule #1 Do NOT save something that is not changed.
+        // Like field storage, delete existing items then add current items.
+        $permissions = array_diff($permissions, $removed);
+        $permissions = array_merge($permissions, $added);
+        $permissions;
+        $role->set('permissions', $permissions);
+        dump('ins',$role);
+          $role->trustData()->save();
+        dump('end');
+//        }
       }
     }
+
+
+//    if ($form_state->hasValue('instance_perms')) {
+//      $user_role_storage = $role_storage->loadMultiple();
+//
+//      $custom_permissions = $form_state->getValue('instance_perms');
+//
+//      /** @var \Drupal\group\Entity\UserRoleInterface[] $roles */
+//      $roles = [];
+//      foreach ($custom_permissions as $permission_name => $field_perm) {
+//        foreach ($field_perm as $role_name => $role_permission) {
+//          if (empty($roles[$role_name])) {
+//            $roles[$role_name] = $user_role_storage[$role_name];
+//          }
+//          // If using this plugin, set permissions to the value submitted in the
+//          // form, else remove all permissions as they will no longer exist.
+//          $role_permission = $form_state->getValue('type') === $this->getPluginId() ? $role_permission : FALSE;
+//          if ($role_permission) {
+//            $roles[$role_name]->grantPermission($permission_name);
+//          }
+//          else {
+//            $roles[$role_name]->revokePermission($permission_name);
+//          }
+//        }
+//      }
+////      dump($roles);
+////      exit();
+//
+////      exit();
+//      // Save all roles.
+//     foreach ($roles as $role) {
+//        $role->trustData()->save();
+//      }
+//    }
   }
 
 
@@ -230,6 +262,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     $options = array_keys($permissions);
 
     $test = $this->permissionsService->getPermissionsByRole();
+    dump($test);
 
 
     $form['fpi_details'] = [
@@ -244,10 +277,24 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     foreach ($instances as $instance) {
 //      $options = array_keys($permissions);
       // Make the permissions table for each group type into a separate panel.
+      $open = false;
+      foreach ($test as $role_name =>$pers){
+        if($role_name != 'administrator') {
+          foreach ($pers as $per) {
+
+            if (str_contains($per, $instance)){
+              dump($instance , $per);
+              $open = true;
+              break 2;
+            }
+        }
+        }
+      }
+
       $form['fpi_details'][$instance] = [
         '#type' => 'details',
         '#title' => $instance,
-        '#open' => false,
+        '#open' => $open,
       ];
       // The permissions table.
       $form['fpi_details'][$instance]['instance_perms'] = [

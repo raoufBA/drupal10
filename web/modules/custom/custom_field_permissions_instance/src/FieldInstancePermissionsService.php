@@ -11,7 +11,7 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * The field permission service for group roles and permissions.
  */
-class FieldPermissionsInstanceService extends FieldPermissionsService {
+class FieldInstancePermissionsService extends FieldPermissionsService {
 
   // File to get all instances.
   const HOSTS_FILE = DRUPAL_ROOT.'/../config/hosts.yaml';
@@ -48,32 +48,10 @@ class FieldPermissionsInstanceService extends FieldPermissionsService {
 //    ];
 //  }
 
-
-
   /**
    * {@inheritdoc}
    */
-  public function getGroupPermissionsByRole() {
-    /** @var \Drupal\group\Entity\GroupRoleInterface[] $roles */
-    $roles = $this->entityTypeManager->getStorage('user_role')->loadMultiple();
-    $field_field_permissions = [];
-    $field_permission_perm = $this->getAllGroupPermissions();
-    foreach ($roles as $role_name => $role) {
-      $role_permissions = $role->getPermissions();
-      $field_field_permissions[$role_name] = [];
-      foreach ($role_permissions as $key => $role_permission) {
-        if (in_array($role_permission, array_keys($field_permission_perm))) {
-          $field_field_permissions[$role_name][] = $role_permission;
-        }
-      }
-    }
-    return $field_field_permissions;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getAllInstancePermissions() {
+  public function getAllGroupPermissions() {
     $permissions = [];
     /** @var \Drupal\field\FieldStorageConfigInterface[] $fields */
     $fields = $this->entityTypeManager->getStorage('field_storage_config')->loadMultiple();
@@ -89,6 +67,47 @@ class FieldPermissionsInstanceService extends FieldPermissionsService {
     }
     return $permissions;
   }
+
+
+  /**
+   * {@inheritdoc}
+   */
+//  public function getGroupPermissionsByRole() {
+//    /** @var \Drupal\group\Entity\GroupRoleInterface[] $roles */
+//    $roles = $this->entityTypeManager->getStorage('user_role')->loadMultiple();
+//    $field_field_permissions = [];
+//    $field_permission_perm = $this->getAllGroupPermissions();
+//    foreach ($roles as $role_name => $role) {
+//      $role_permissions = $role->getPermissions();
+//      $field_field_permissions[$role_name] = [];
+//      foreach ($role_permissions as $key => $role_permission) {
+//        if (in_array($role_permission, array_keys($field_permission_perm))) {
+//          $field_field_permissions[$role_name][] = $role_permission;
+//        }
+//      }
+//    }
+//    return $field_field_permissions;
+//  }
+
+  /**
+   * {@inheritdoc}
+   */
+//  public function getAllInstancePermissions() {
+//    $permissions = [];
+//    /** @var \Drupal\field\FieldStorageConfigInterface[] $fields */
+//    $fields = $this->entityTypeManager->getStorage('field_storage_config')->loadMultiple();
+//    foreach ($fields as $key => $field) {
+//      // Check if this plugin defines custom permissions.
+//      $permission_type = $this->fieldGetPermissionType($field);
+//      if ($permission_type !== FieldPermissionTypeInterface::ACCESS_PUBLIC) {
+//        $plugin = $this->permissionTypeManager->createInstance($permission_type, [], $field);
+//        if ($plugin instanceof CustomPermissionsInterface) {
+//          $permissions += $plugin->getPermissions();
+//        }
+//      }
+//    }
+//    return $permissions;
+//  }
 
     /**
      * @return array
