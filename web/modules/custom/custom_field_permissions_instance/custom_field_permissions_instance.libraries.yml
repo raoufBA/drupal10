@@ -1,4 +1,7 @@
 field_permissions:
   version: VERSION
+  css:
+    theme:
+      css/custom_field_permissions_instance.css: { }
   js:
     js/custom_field_permissions_instance.js: {}
