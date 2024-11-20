@@ -1,14 +1,13 @@
 <?php
 
-use Drupal\Core\Form\FormStateInterface;
-
 /**
-* Implements hook_module_implements_alter().
-*/
-function custom_field_permissions_instance_module_implements_alter(&$implementations, $hook)
-{
-
-// Ensure that custom_field_permissions_instance runs after field_permissions
+ * Implements hook_module_implements_alter().
+ *
+ * @param array<mixed> $implementations
+ * @param string $hook
+ */
+function custom_field_permissions_instance_module_implements_alter(array &$implementations, string $hook) : void {
+  // Ensure that custom_field_permissions_instance runs after field_permissions
   if (isset($implementations['custom_field_permissions_instance']) && isset($implementations['field_permissions'])) {
     $saved = $implementations['custom_field_permissions_instance'];
     unset($implementations['custom_field_permissions_instance']);
@@ -16,22 +15,3 @@ function custom_field_permissions_instance_module_implements_alter(&$implementat
   }
 }
 
-/**
-* Implements hook_form_FORM_ID_alter().
-*
-* @see field_permissions_form_field_config_edit_form_alter()
-*/
-function custom_field_permissions_instance_form_field_config_edit_form_alter(&$form, FormStateInterface $form_state) {
-
-// Need to adjust the options for the field permissions plugin depending on
-// whether the field is attached to a group or group entity.
-///** @var \Drupal\group\Entity\GroupType $group_type */
-//$group_type = \Drupal::service('custom_field_permissions_instance.current_instance_type')->getGroupTypeFromRoute();
-//if (!$group_type) {
-//// Remove the group field permissions option
-//unset($form['field']['field_permissions']['type']['#options']['custom_instance']);
-//// Remove the group permissions matrix.
-//unset($form['instance_perms']);
-//}
-
-}
