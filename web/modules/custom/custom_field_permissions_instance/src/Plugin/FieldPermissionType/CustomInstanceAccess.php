@@ -6,14 +6,15 @@ use Drupal;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\custom_field_permissions_instance\AwfInstanceHelper;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\field\FieldStorageConfigInterface;
 use Drupal\field_permissions\FieldPermissionsServiceInterface;
 use Drupal\field_permissions\Plugin\AdminFormSettingsInterface;
 use Drupal\field_permissions\Plugin\CustomPermissionsInterface;
 use Drupal\field_permissions\Plugin\FieldPermissionType\Base;
+use Drupal\mosaic_app\Helper\AwfInstanceHelper;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\RoleInterface;
 use Drupal\user\RoleStorageInterface;
@@ -43,6 +44,11 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
   protected $permissionsService;
 
   /**
+   * @var \Drupal\Core\Messenger\MessengerInterface
+   */
+  protected $messenger;
+
+  /**
    * Constructs the plugin.
    *
    * @param array<mixed> $configuration
@@ -55,10 +61,12 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    *   The field storage.
    * @param \Drupal\field_permissions\FieldPermissionsServiceInterface $permissions_service
    *   The permissions service
+   * @param \Drupal\Core\Messenger\MessengerInterface $messenger
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage, FieldPermissionsServiceInterface $permissions_service) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage, FieldPermissionsServiceInterface $permissions_service, MessengerInterface $messenger) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $field_storage);
     $this->permissionsService = $permissions_service;
+    $this->messenger = $messenger;
   }
 
   /**
@@ -77,6 +85,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
       $plugin_definition,
       $field_storage,
       $container->get('field_permissions.permissions_service'),
+      $container->get('messenger'),
     );
   }
 
@@ -159,15 +168,14 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
 
     $field_name = $this->fieldStorage->getName();
     // Charger la configuration du stockage de champ.
-    if (!$this->fieldStorage) {
-      Drupal::messenger()->addError(t('The field @field_name does not exist.', ['@field_name' => $field_name]));
+    if (!$lodData = $this->getConfigPermissions()) {
+      $this->messenger()->addError(t('The field @field_name does not exist.', ['@field_name' => $field_name]));
 
       return;
     }
 
-    $lodData = $this->getConfigPermissions();
+    /* @phpstan-ignore-next-line */
     $field_config = $form_state->getFormObject()->getEntity();
-
 
     $current_bundle = $field_config->getTargetBundle();
 
@@ -177,14 +185,13 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     }
 
 
-
     $form['fpi_details'] = [
       '#type' => 'details',
       '#title' => $this->t('Instance types'),
       '#open' => true,
       '#id' => 'instance_perms',
     ];
-
+    /* @phpstan-ignore-next-line */
     $instances = $this->permissionsService->getPrdInstances();
 
     foreach ($instances as $instance) {
@@ -193,7 +200,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
       // Iterate over the permissions of the current instance for the current bundle
       foreach ($lodData[$current_bundle][$instance] ?? [] as $role_permissions) {
         // Check for any non-admin role with a value of '1'
-        if (count(array_diff($role_permissions, ["1"])) != 3) {
+        if (count(array_intersect($role_permissions, ["1"])) > 1) {
           $open = true;
           break; // Stop once a valid permission is found
         }
@@ -273,7 +280,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     $perms_name = array_keys($permission_list);
     /* @phpstan-ignore-next-line */
     foreach ($perms_name as $perm_name) {
-        $permissions[$perm_name] = $permission_list[$perm_name];
+      $permissions[$perm_name] = $permission_list[$perm_name];
     }
 
     return $permissions;
@@ -297,9 +304,10 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     $instance_permissions = $form_state->getValue('instance_perms');
 
     // Charger la configuration du stockage de champ.
+    /** @phpstan-ignore-next-line */
     $this->fieldStorage = FieldStorageConfig::loadByName($target_entity_type_id, $field_name);
     if (!$this->fieldStorage) {
-      Drupal::messenger()->addError(t('The field @field_name does not exist.', ['@field_name' => $field_name]));
+      $this->messenger()->addError(t('The field @field_name does not exist.', ['@field_name' => $field_name]));
       return;
     }
     if($this_plugin_applies){
@@ -318,11 +326,10 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
       $this->fieldStorage->setThirdPartySetting('custom_field_permissions_instance', 'instance_permissions', $current_config);
       // Charger les permissions.
       $this->fieldStorage->save();
-
-      Drupal::messenger()->addMessage(t('Permissions have been saved for the field @field_name.', ['@field_name' => $field_name]));
+      $this->messenger->addMessage(t('Permissions have been saved for the field @field_name.', ['@field_name' => $field_name]));
     }
     else {
-      Drupal::messenger()->addError(t('The field @field_name does not support third party settings.', ['@field_name' => $field_name]));
+      $this->messenger->addError(t('The field @field_name does not support third party settings.', ['@field_name' => $field_name]));
     }
   }
 
@@ -336,10 +343,11 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
 
   /**
    * @param AccountInterface $account
-   * @param $operation
+   * @param string $operation
+   *
    * @return bool
    */
-  public function UserHasPermission(AccountInterface $account, $operation): bool
+  public function UserHasPermission(AccountInterface $account,  string $operation): bool
   {
     foreach ($account->getRoles() as $role) {
       if ($operation[$role]) {
