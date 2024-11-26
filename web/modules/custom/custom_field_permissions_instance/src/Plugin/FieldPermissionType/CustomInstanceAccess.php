@@ -7,17 +7,18 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\custom_field_permissions_instance\AwfInstanceHelper;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\field\FieldStorageConfigInterface;
 use Drupal\field_permissions\FieldPermissionsServiceInterface;
 use Drupal\field_permissions\Plugin\AdminFormSettingsInterface;
 use Drupal\field_permissions\Plugin\CustomPermissionsInterface;
 use Drupal\field_permissions\Plugin\FieldPermissionType\Base;
-use Drupal\mosaic_app\Helper\AwfInstanceHelper;
 use Drupal\user\EntityOwnerInterface;
+use Drupal\user\RoleInterface;
 use Drupal\user\RoleStorageInterface;
 use Drupal\user\UserInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * Defines custom access for fields.
@@ -88,25 +89,30 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
       "view",
     ]), 'The operation is either "edit" or "view", "' . $operation . '" given instead.');
 
-    $field_name = $this->fieldStorage->getName();
-    $current_instance = AwfInstanceHelper::getMosaicId() . ' ';
-    if ($operation === 'edit' && $entity->isNew()) {
-      return $account->hasPermission($current_instance . 'create ' . $field_name);
-    }
-
-    if ($account->hasPermission($current_instance . $operation . ' ' . $field_name)) {
+    $configPermission = $this->getConfigPermissions();
+    $current_instance = AwfInstanceHelper::getMosaicId();
+    $bundle = $entity->bundle();
+    if(!$current_instance  || !$permissions = $configPermission[$bundle]){
       return true;
     }
-    else {
-      // User entities don't implement `EntityOwnerInterface`.
-      if ($entity instanceof UserInterface) {
-        return $entity->id() == $account->id() && $account->hasPermission($current_instance . $operation . ' own ' . $field_name);
-      }
-      elseif ($entity instanceof EntityOwnerInterface) {
-        return $entity->getOwnerId() === $account->id() && $account->hasPermission($current_instance . $operation . ' own ' . $field_name);
-      }
+
+    $entity_permissions = $permissions[$current_instance];
+
+    if ($operation === 'edit' && $entity->isNew()) {
+      return $this->UserHasPermission($account, $entity_permissions[$operation]);
     }
 
+    if ($this->UserHasPermission($account, $entity_permissions[$operation])) {
+      return true;
+    } else {
+      // User entities don't implement `EntityOwnerInterface`.
+      if ($entity instanceof UserInterface) {
+        return $entity->id() == $account->id() && $this->UserHasPermission($account,$entity_permissions[$operation.' own']);
+      } elseif ($entity instanceof EntityOwnerInterface) {
+        return $entity->getOwnerId() === $account->id() && $this->UserHasPermission($account,$entity_permissions[$operation.' own']
+          );
+      }
+    }
     // Default to deny since access can be explicitly granted (edit field_name),
     // even if this entity type doesn't implement the EntityOwnerInterface.
     return false;
@@ -147,11 +153,30 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    *   The user role storage.
    */
   protected function addPermissionsGrid(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) : void {
-    /** @var \Drupal\user\RoleInterface[] $roles */
+    /** @var RoleInterface[] $roles */
     $roles = $role_storage->loadMultiple();
     $permissions = $this->getPermissions();
-    $options = array_keys($permissions);
-    $test = $this->permissionsService->getPermissionsByRole();
+
+    $field_name = $this->fieldStorage->getName();
+    // Charger la configuration du stockage de champ.
+    if (!$this->fieldStorage) {
+      Drupal::messenger()->addError(t('The field @field_name does not exist.', ['@field_name' => $field_name]));
+
+      return;
+    }
+
+    $lodData = $this->getConfigPermissions();
+    $field_config = $form_state->getFormObject()->getEntity();
+
+
+    $current_bundle = $field_config->getTargetBundle();
+
+    // Ensure we are only working with the current bundle's data.
+    if (!isset($lodData[$current_bundle])) {
+      $lodData[$current_bundle] = [];
+    }
+
+
 
     $form['fpi_details'] = [
       '#type' => 'details',
@@ -159,21 +184,18 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
       '#open' => true,
       '#id' => 'instance_perms',
     ];
-    /* @phpstan-ignore-next-line */
+
     $instances = $this->permissionsService->getPrdInstances();
 
     foreach ($instances as $instance) {
-      //      $options = array_keys($permissions);
-      // Make the permissions table for each instance type into a separate panel.
       $open = false;
-      foreach ($test as $role_name => $pers) {
-        if ($role_name != 'administrator') {
-          foreach ($pers as $per) {
-            if (str_contains($per, $instance)) {
-              $open = true;
-              break 2;
-            }
-          }
+
+      // Iterate over the permissions of the current instance for the current bundle
+      foreach ($lodData[$current_bundle][$instance] ?? [] as $role_permissions) {
+        // Check for any non-admin role with a value of '1'
+        if (count(array_diff($role_permissions, ["1"])) != 3) {
+          $open = true;
+          break; // Stop once a valid permission is found
         }
       }
 
@@ -182,27 +204,24 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
         '#title' => $instance,
         '#open' => $open,
       ];
-      // The permissions table.
+
+      // Permissions table.
       $form['fpi_details'][$instance]['instance_perms'] = [
         '#type' => 'table',
         '#header' => [$this->t('Permission')],
         '#attributes' => ['class' => ['permissions', 'js-permissions']],
         '#sticky' => true,
       ];
+
       foreach ($roles as $role) {
         $form['fpi_details'][$instance]['instance_perms']['#header'][] = [
           'data' => $role->label(),
           'class' => ['checkbox'],
         ];
       }
-      $permission_instance = array_filter($permissions, function($permission) use ($instance) {
-        if (str_contains($permission, $instance)) {
-          return $permission;
-        }
-      }, ARRAY_FILTER_USE_KEY);
 
-      foreach ($permission_instance as $provider => $permission) {
-        $form['fpi_details'][$instance]['instance_perms'][$provider]['description'] = [
+      foreach ($permissions as $permission_key => $permission) {
+        $form['fpi_details'][$instance]['instance_perms'][$permission_key]['description'] = [
           '#type' => 'inline_template',
           '#template' => '<div class="permission"><span class="title">{{ title }}</span>{% if description or warning %}<div class="description">{% if warning %}<em class="permission-warning">{{ warning }}</em> {% endif %}{{ description }}</div>{% endif %}</div>',
           '#context' => [
@@ -210,32 +229,39 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
           ],
         ];
 
-        $options[$provider] = '';
-
-        foreach ($roles as $name => $role) {
-          $form['fpi_details'][$instance]['instance_perms'][$provider][$name] = [
-            '#title' => $name . ': ' . $permission["title"],
+        foreach ($roles as $role_id => $role) {
+          $form['fpi_details'][$instance]['instance_perms'][$permission_key][$role_id] = [
+            '#title' => $role_id.': '.$permission["title"],
             '#title_display' => 'invisible',
             '#type' => 'checkbox',
-            '#attributes' => ['class' => ['rid-' . $name, 'js-rid-' . $name]],
+            '#attributes' => [
+              'class' => ['rid-'.$role_id, 'js-rid-'.$role_id],
+            ],
             '#wrapper_attributes' => [
               'class' => ['checkbox'],
             ],
+            // Use the structure to generate the correct name attribute.
+            '#parents' => ['instance_perms', $current_bundle, $instance, $permission_key, $role_id],
           ];
-          if (!empty($test[$name]) && in_array($provider, $test[$name])) {
-            $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
+
+          // Set default values based on existing permissions.
+          if (!empty($lodData[$current_bundle][$instance][$permission_key][$role_id])) {
+            $form['fpi_details'][$instance]['instance_perms'][$permission_key][$role_id]['#default_value'] = "1";
           }
 
+          // Disable for admin roles.
           if ($role->isAdmin()) {
-            $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#disabled'] = true;
-            $form['fpi_details'][$instance]['instance_perms'][$provider][$name]['#default_value'] = true;
+            $form['fpi_details'][$instance]['instance_perms'][$permission_key][$role_id]['#disabled'] = true;
+            $form['fpi_details'][$instance]['instance_perms'][$permission_key][$role_id]['#default_value'] = "1";
           }
         }
       }
     }
-    // Attach the field_permissions_instance library.
+
+    // Attach the library for styling.
     $form['#attached']['library'][] = 'custom_field_permissions_instance/field_permissions';
   }
+
 
   /**
    * @return array<mixed>
@@ -246,14 +272,8 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
     $permission_list = $this->permissionsService->getList($field_name);
     $perms_name = array_keys($permission_list);
     /* @phpstan-ignore-next-line */
-    $instances = $this->permissionsService->getPrdInstances();
     foreach ($perms_name as $perm_name) {
-      $name = $perm_name . ' ' . $field_name;
-      $permissions[$name] = $permission_list[$perm_name];
-      foreach ($instances as $instance) {
-        $name = $instance . ' ' . $perm_name . ' ' . $field_name;
-        $permissions[$name] = $permission_list[$perm_name];
-      }
+        $permissions[$perm_name] = $permission_list[$perm_name];
     }
 
     return $permissions;
@@ -268,26 +288,66 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    */
   public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) :void {
     $this_plugin_applies = $form_state->getValue('type') === $this->getPluginId();
-    $custom_permissions = $form_state->getValue('instance_perms');
-    $keys = array_keys($custom_permissions);
-    $custom_permissions = $this->transposeArray($custom_permissions);
-    foreach ($role_storage->loadMultiple() as $role) {
-      $permissions = $role->getPermissions();
-      $removed = array_values(array_intersect($permissions, $keys));
-      $added = $this_plugin_applies ? array_keys(array_filter($custom_permissions[$role->id()])) : [];
-      // Permissions in role object are sorted on save. Permissions on form are
-      // not in same order (the 'any' and 'own' items are flipped) but need to
-      // be as array equality tests keys and values. So sort the added items.
-      sort($added);
-      if ($removed != $added) {
-        // Rule #1 Do NOT save something that is not changed.
-        // Like field storage, delete existing items then add current items.
-        $permissions = array_diff($permissions, $removed);
-        $permissions = array_merge($permissions, $added);
-        $role->set('permissions', $permissions);
-        $role->trustData()->save();
+    // Récupérer les valeurs du formulaire.
+    $field_name = $this->fieldStorage->getName();
+    $target_entity_type_id = $this->fieldStorage->getTargetEntityTypeId();
+
+
+
+    $instance_permissions = $form_state->getValue('instance_perms');
+
+    // Charger la configuration du stockage de champ.
+    $this->fieldStorage = FieldStorageConfig::loadByName($target_entity_type_id, $field_name);
+    if (!$this->fieldStorage) {
+      Drupal::messenger()->addError(t('The field @field_name does not exist.', ['@field_name' => $field_name]));
+      return;
+    }
+    if($this_plugin_applies){
+      $current_config = $this->getConfigPermissions();
+
+      $current_config = array_merge($current_config, $instance_permissions);
+    }else{
+      $current_config=   [];
+    }
+
+
+
+    // Vérifier que le champ supporte les "third_party_settings".
+    if (method_exists($this->fieldStorage, 'setThirdPartySetting')) {
+      // Enregistrer les permissions dans les "third_party_settings".
+      $this->fieldStorage->setThirdPartySetting('custom_field_permissions_instance', 'instance_permissions', $current_config);
+      // Charger les permissions.
+      $this->fieldStorage->save();
+
+      Drupal::messenger()->addMessage(t('Permissions have been saved for the field @field_name.', ['@field_name' => $field_name]));
+    }
+    else {
+      Drupal::messenger()->addError(t('The field @field_name does not support third party settings.', ['@field_name' => $field_name]));
+    }
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getConfigPermissions(): mixed
+  {
+    return $this->fieldStorage->getThirdPartySetting('custom_field_permissions_instance', 'instance_permissions', []);
+  }
+
+  /**
+   * @param AccountInterface $account
+   * @param $operation
+   * @return bool
+   */
+  public function UserHasPermission(AccountInterface $account, $operation): bool
+  {
+    foreach ($account->getRoles() as $role) {
+      if ($operation[$role]) {
+        return true;
       }
     }
+
+    return false;
   }
 
   /**

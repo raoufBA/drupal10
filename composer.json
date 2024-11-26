@@ -26,6 +26,7 @@
         "drupal/masquerade": "^2.0",
         "drupal/metatag": "^2.0",
         "drupal/module_filter": "^5.0",
+        "drupal/paragraphs": "^1.18",
         "drupal/schema_metatag": "^3.0",
         "drupal/variationcache": "^1.5",
         "drupal/webform": "^6.2",

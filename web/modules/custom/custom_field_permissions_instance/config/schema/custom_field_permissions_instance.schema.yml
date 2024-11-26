@@ -1,0 +1,29 @@
+# Schema for the Field Permissions Instance module.
+
+field.storage.*.*.third_party.field_permissions_instance:
+  type: mapping
+  label: 'Custom field permissions instance settings'
+  mapping:
+    instance_permissions:
+      type: mapping
+      label: 'Bundle-specific Permissions'
+      mapping:
+        # Dynamic key for bundles (e.g., 'article', 'page').
+        '*':
+          type: mapping
+          label: 'Bundle'
+          mapping:
+            # Dynamic key for instances (e.g., 'amt', 'amundi-distrib').
+            '*':
+              type: mapping
+              label: 'Instance'
+              mapping:
+                # Dynamic key for permissions (e.g., 'create', 'edit own').
+                '*':
+                  type: mapping
+                  label: 'Permission'
+                  mapping:
+                    # Dynamic key for roles (e.g., 'anonymous', 'authenticated').
+                    '*':
+                      type: string
+                      label: 'Has permission'
