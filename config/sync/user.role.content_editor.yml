@@ -9,7 +9,6 @@ dependencies:
   module:
     - comment
     - contextual
-    - field_permissions
     - file
     - node
     - path
@@ -30,7 +29,6 @@ permissions:
   - 'access toolbar'
   - 'administer url aliases'
   - 'create article content'
-  - 'create field_color'
   - 'create page content'
   - 'create terms in tags'
   - 'create url aliases'
@@ -41,7 +39,6 @@ permissions:
   - 'delete page revisions'
   - 'edit own article content'
   - 'edit own comments'
-  - 'edit own field_color'
   - 'edit own page content'
   - 'edit terms in tags'
   - 'revert all revisions'
