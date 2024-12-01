@@ -1,4 +1,4 @@
-field_permissions:
+custom_field_permissions_instance:
   version: VERSION
   css:
     theme:

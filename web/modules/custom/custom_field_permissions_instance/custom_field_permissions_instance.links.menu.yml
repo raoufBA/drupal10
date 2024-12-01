@@ -1,0 +1,5 @@
+custom_field_permissions_instance.reports:
+  title: 'Report all field permissions'
+  parent: system.admin_reports
+  description: 'Report all permissions set.'
+  route_name: custom_field_permissions_instance.reports

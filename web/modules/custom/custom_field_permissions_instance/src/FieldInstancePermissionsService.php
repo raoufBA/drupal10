@@ -6,10 +6,10 @@ use Drupal;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\field_permissions\FieldPermissionsService;
-use Drupal\field_permissions\Plugin\CustomPermissionsInterface;
-use Drupal\field_permissions\Plugin\FieldPermissionType\Manager;
-use Drupal\field_permissions\Plugin\FieldPermissionTypeInterface;
+use Drupal\custom_field_permissions_instance\FieldPermissionsService;
+use Drupal\custom_field_permissions_instance\Plugin\CustomPermissionsInterface;
+use Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\Manager;
+use Drupal\custom_field_permissions_instance\Plugin\FieldPermissionTypeInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Yaml\Yaml;
 

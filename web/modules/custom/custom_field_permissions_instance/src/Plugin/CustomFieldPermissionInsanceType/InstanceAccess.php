@@ -23,14 +23,14 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Defines custom access for fields.
  *
- * @FieldPermissionType(
+ * @CustomFieldPermissionInstanceType(
  *   id = "custom_instance",
  *   title = @Translation("Custom instance permissions"),
  *   description = @Translation("Define custom permissions for this field in a
  *   instance context."), weight = 51
  * )
  */
-class CustomInstanceAccess extends Base implements CustomPermissionsInterface, AdminFormSettingsInterface {
+class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFormSettingsInterface {
 
   // File to get all instances.
   const HOSTS_FILE = DRUPAL_ROOT . '/../config/hosts.yaml';
@@ -68,7 +68,7 @@ class CustomInstanceAccess extends Base implements CustomPermissionsInterface, A
    * @param $plugin_definition
    * @param \Drupal\field\FieldStorageConfigInterface|null $field_storage
    *
-   * @return \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\CustomInstanceAccess|\Drupal\field_permissions\Plugin\FieldPermissionType\Base|static
+   * @return \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\InstanceAccess|\Drupal\field_permissions\Plugin\FieldPermissionType\Base|static
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage = null) {
     return new static(

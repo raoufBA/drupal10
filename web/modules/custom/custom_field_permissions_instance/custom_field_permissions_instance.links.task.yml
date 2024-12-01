@@ -1,0 +1,4 @@
+custom_field_permissions_instance.reports:
+  route_name: custom_field_permissions_instance.reports
+  base_route: entity.field_storage_config.collection
+  title: Permissions

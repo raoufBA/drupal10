@@ -4,6 +4,36 @@ field.storage.*.*.third_party.field_permissions_instance:
   type: mapping
   label: 'Custom field permissions instance settings'
   mapping:
+    bundles_types_permissions:
+      type: mapping
+      label: 'Selected Field Types by Bundle'
+      mapping:
+        # Dynamic key for bundles (e.g., 'article', 'page').
+        '*':
+          type: mapping
+          label: 'Bundle-specific Permissions'
+          mapping:
+            permission_type:
+              type: string
+              label: 'Permission Type'
+    role_permissions:
+      type: mapping
+      label: 'Bundle-specific Permissions'
+      mapping:
+        # Dynamic key for bundles (e.g., 'article', 'page').
+        '*':
+          type: mapping
+          label: 'Bundle'
+          mapping:
+            # Dynamic key for permissions (e.g., 'create', 'edit own').
+            '*':
+              type: mapping
+              label: 'Permission'
+              mapping:
+                # Dynamic key for roles (e.g., 'anonymous', 'authenticated').
+                '*':
+                  type: string
+                  label: 'Has permission'
     instance_permissions:
       type: mapping
       label: 'Bundle-specific Permissions'
