@@ -1,5 +1,5 @@
 permission_callbacks:
-  - Drupal\custom_field_permissions_instance\FieldPermissionsService::getAllPermissions
+  - Drupal\custom_field_permissions_instance\CustomFieldPermissionsService::getAllPermissions
 administer field permissions instance:
   title: 'Administer field permissions'
   description: 'Manage field permissions and field permissions settings.'

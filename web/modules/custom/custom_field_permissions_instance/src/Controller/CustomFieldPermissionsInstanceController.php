@@ -6,7 +6,7 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Link;
 use Drupal\field\FieldStorageConfigInterface;
-use Drupal\custom_field_permissions_instance\FieldPermissionsServiceInterface;
+use Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface;
 use Drupal\custom_field_permissions_instance\Plugin\CustomPermissionsInterface;
 use Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\Manager;
 use Drupal\custom_field_permissions_instance\Plugin\FieldPermissionTypeInterface;
@@ -28,7 +28,7 @@ class CustomFieldPermissionsInstanceController extends ControllerBase {
   /**
    * The field permission service.
    *
-   * @var \Drupal\custom_field_permissions_instance\FieldPermissionsServiceInterface
+   * @var \Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface
    */
   protected $fieldPermissions;
 
@@ -42,14 +42,14 @@ class CustomFieldPermissionsInstanceController extends ControllerBase {
   /**
    * Construct the field permission controller.
    *
-   * @param \Drupal\custom_field_permissions_instance\FieldPermissionsServiceInterface $field_permissions_service
+   * @param \Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface $field_permissions_service
    *   Field permissions services.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   The entity type manager service.
    * @param \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\Manager $permission_type_manager
    *   The permission type plugin manager.
    */
-  public function __construct(FieldPermissionsServiceInterface $field_permissions_service, EntityTypeManagerInterface $entity_type_manager, Manager $permission_type_manager) {
+  public function __construct(CustomFieldPermissionsServiceInterface $field_permissions_service, EntityTypeManagerInterface $entity_type_manager, Manager $permission_type_manager) {
     $this->entityTypeManager = $entity_type_manager;
     $this->fieldPermissions = $field_permissions_service;
     $this->permissionTypeManager = $permission_type_manager;

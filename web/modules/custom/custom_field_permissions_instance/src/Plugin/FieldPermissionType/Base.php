@@ -7,7 +7,7 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\field\FieldStorageConfigInterface;
-use Drupal\custom_field_permissions_instance\FieldPermissionsServiceInterface;
+use Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface;
 use Drupal\custom_field_permissions_instance\Plugin\FieldPermissionTypeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -26,9 +26,9 @@ abstract class Base extends PluginBase implements FieldPermissionTypeInterface, 
   /**
    * The fields permissions service.
    *
-   * @var \Drupal\custom_field_permissions_instance\FieldPermissionsServiceInterface
+   * @var \Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface
    */
-  protected $fieldPermissionsService;
+  protected $CustomFieldPermissionsService;
 
   /**
    * Constructs the plugin.
@@ -41,19 +41,19 @@ abstract class Base extends PluginBase implements FieldPermissionTypeInterface, 
    *   The plugin implementation definition.
    * @param \Drupal\field\FieldStorageConfigInterface $field_storage
    *   The field storage.
-   * @param \Drupal\custom_field_permissions_instance\FieldPermissionsServiceInterface|null $field_permissions_service
+   * @param \Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface|null $field_permissions_service
    *   Field permissions service.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage, FieldPermissionsServiceInterface $field_permissions_service = NULL) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage, CustomFieldPermissionsServiceInterface $field_permissions_service = NULL) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->fieldStorage = $field_storage;
     if ($field_permissions_service === NULL) {
       @trigger_error('Calling ' . __METHOD__ . '() without the $field_permissions_service argument is deprecated in custom_field_permissions_instance:8.x-1.4 and will be required in custom_field_permissions_instance:8.x-2.0. See https://www.drupal.org/node/3359471', E_USER_DEPRECATED);
       // @phpstan-ignore-next-line
-      $this->fieldPermissionsService = \Drupal::service('custom_field_permissions_instance.permissions_service');
+      $this->CustomFieldPermissionsService = \Drupal::service('custom_field_permissions_instance.permissions_service');
     }
     else {
-      $this->fieldPermissionsService = $field_permissions_service;
+      $this->CustomFieldPermissionsService = $field_permissions_service;
     }
   }
 

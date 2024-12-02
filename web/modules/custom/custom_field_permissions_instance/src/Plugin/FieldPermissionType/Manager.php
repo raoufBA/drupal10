@@ -8,8 +8,9 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
-use Drupal\custom_field_permissions_instance\Annotation\FieldPermissionType;
+use Drupal\custom_field_permissions_instance\Annotation\CustomFieldPermissionInstanceType;
 use Drupal\custom_field_permissions_instance\Plugin\FieldPermissionTypeInterface;
+use Traversable;
 
 /**
  * Field permission type plugin manager.
@@ -28,7 +29,7 @@ class Manager extends DefaultPluginManager {
    *   The module handler to invoke the alter hook with.
    */
   public function __construct(\Traversable $namespaces, CacheBackendInterface $cache_backend, ModuleHandlerInterface $module_handler) {
-    parent::__construct('Plugin/FieldPermissionType', $namespaces, $module_handler, FieldPermissionTypeInterface::class, FieldPermissionType::class);
+    parent::__construct('Plugin/FieldPermissionType', $namespaces, $module_handler, FieldPermissionTypeInterface::class, CustomFieldPermissionInstanceType::class);
     $this->setCacheBackend($cache_backend, 'field_permission_type_plugins');
     $this->alterInfo('field_permission_type_plugin');
   }
@@ -60,13 +61,15 @@ class Manager extends DefaultPluginManager {
     else {
       $plugin = new $plugin_class($configuration, $plugin_id, $plugin_definition, $field_storage);
     }
+
     return $plugin;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getDefinitions() {
+  public function getDefinitions(): ?array
+  {
     $definitions = parent::getDefinitions();
 
     // Order by weight.
@@ -74,6 +77,7 @@ class Manager extends DefaultPluginManager {
       if ($a['weight'] == $b['weight']) {
         return 0;
       }
+
       return $a['weight'] < $b['weight'] ? -1 : 1;
     });
 

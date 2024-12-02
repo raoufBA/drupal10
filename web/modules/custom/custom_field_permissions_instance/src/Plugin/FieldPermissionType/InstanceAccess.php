@@ -10,10 +10,10 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\custom_field_permissions_instance\AwfInstanceHelper;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\field\FieldStorageConfigInterface;
-use Drupal\field_permissions\FieldPermissionsServiceInterface;
-use Drupal\field_permissions\Plugin\AdminFormSettingsInterface;
-use Drupal\field_permissions\Plugin\CustomPermissionsInterface;
-use Drupal\field_permissions\Plugin\FieldPermissionType\Base;
+use Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface;
+use Drupal\custom_field_permissions_instance\Plugin\AdminFormSettingsInterface;
+use Drupal\custom_field_permissions_instance\Plugin\CustomPermissionsInterface;
+use Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\Base;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\RoleInterface;
 use Drupal\user\RoleStorageInterface;
@@ -38,7 +38,7 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
   /**
    * The permission service.
    *
-   * @var \Drupal\field_permissions\FieldPermissionsServiceInterface
+   * @var \Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface
    */
   protected $permissionsService;
 
@@ -53,10 +53,10 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
    *   The plugin implementation definition.
    * @param \Drupal\field\FieldStorageConfigInterface $field_storage
    *   The field storage.
-   * @param \Drupal\field_permissions\FieldPermissionsServiceInterface $permissions_service
+   * @param \Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface $permissions_service
    *   The permissions service
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage, FieldPermissionsServiceInterface $permissions_service) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage, CustomFieldPermissionsServiceInterface $permissions_service) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $field_storage);
     $this->permissionsService = $permissions_service;
   }
@@ -68,7 +68,7 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
    * @param $plugin_definition
    * @param \Drupal\field\FieldStorageConfigInterface|null $field_storage
    *
-   * @return \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\InstanceAccess|\Drupal\field_permissions\Plugin\FieldPermissionType\Base|static
+   * @return \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\InstanceAccess|\Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\Base|static
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition, FieldStorageConfigInterface $field_storage = null) {
     return new static(
@@ -76,7 +76,7 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
       $plugin_id,
       $plugin_definition,
       $field_storage,
-      $container->get('field_permissions.permissions_service'),
+      $container->get('custom_field_permissions_instance.permissions_service'),
     );
   }
 
@@ -139,7 +139,7 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
     $this->addPermissionsGrid($form, $form_state, $role_storage);
 
     // Only display the permissions matrix if this type is selected.
-    $form['#attached']['library'][] = 'field_permissions/field_permissions';
+    $form['#attached']['library'][] = 'custom_field_permissions_instance/custom_field_permissions_instance';
   }
 
   /**
@@ -165,12 +165,13 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
       return;
     }
 
-    $lodData = $this->getConfigPermissions();
+
     $field_config = $form_state->getFormObject()->getEntity();
 
 
     $current_bundle = $field_config->getTargetBundle();
 
+    $lodData = $this->getConfigPermissions();
     // Ensure we are only working with the current bundle's data.
     if (!isset($lodData[$current_bundle])) {
       $lodData[$current_bundle] = [];
@@ -259,7 +260,7 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
     }
 
     // Attach the library for styling.
-    $form['#attached']['library'][] = 'custom_field_permissions_instance/field_permissions';
+    $form['#attached']['library'][] = 'custom_field_permissions_instance/custom_field_permissions_instance';
   }
 
 
@@ -291,9 +292,6 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
     // Récupérer les valeurs du formulaire.
     $field_name = $this->fieldStorage->getName();
     $target_entity_type_id = $this->fieldStorage->getTargetEntityTypeId();
-
-
-
     $instance_permissions = $form_state->getValue('instance_perms');
 
     // Charger la configuration du stockage de champ.
@@ -309,9 +307,6 @@ class InstanceAccess extends Base implements CustomPermissionsInterface, AdminFo
     }else{
       $current_config=   [];
     }
-
-
-
     // Vérifier que le champ supporte les "third_party_settings".
     if (method_exists($this->fieldStorage, 'setThirdPartySetting')) {
       // Enregistrer les permissions dans les "third_party_settings".

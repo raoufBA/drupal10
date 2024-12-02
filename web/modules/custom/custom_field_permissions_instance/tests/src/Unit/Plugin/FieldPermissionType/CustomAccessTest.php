@@ -5,7 +5,7 @@ namespace Drupal\Tests\field_permissions\Unit\Plugin\FieldPermissionType;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\field\FieldStorageConfigInterface;
-use Drupal\field_permissions\FieldPermissionsService;
+use Drupal\field_permissions\CustomFieldPermissionsService;
 use Drupal\field_permissions\Plugin\FieldPermissionType\RoleAccess;
 use Drupal\Tests\UnitTestCase;
 use Drupal\user\EntityOwnerInterface;
@@ -34,7 +34,7 @@ class CustomAccessTest extends UnitTestCase {
    */
   public function setUp():void {
     parent::setUp();
-    $field_permissions = $this->prophesize(FieldPermissionsService::class);
+    $field_permissions = $this->prophesize(CustomFieldPermissionsService::class);
     $storage = $this->prophesize(FieldStorageConfigInterface::class);
     $storage->getName()->willReturn('foo_field');
 

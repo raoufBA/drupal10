@@ -81,14 +81,14 @@ class FieldReportTest extends BrowserTestBase {
     $this->assertSession()->pageTextNotContains('All users have this permission');
 
     // Set to private.
-    $this->fieldStorage->setThirdPartySetting('field_permissions', 'permission_type', FieldPermissionTypeInterface::ACCESS_PRIVATE);
+    $this->fieldStorage->setThirdPartySetting('custom_field_permissions_instance', 'bundles_types_permissions', FieldPermissionTypeInterface::ACCESS_PRIVATE);
     $this->fieldStorage->save();
     $this->drupalGet(Url::fromRoute('field_permissions.reports'));
     $this->assertSession()->statusCodeEquals(200);
     $this->assertSession()->pageTextContains('Private (Only author and administrators can edit and view.)');
 
     // Set custom, and grant no permissions initially.
-    $this->fieldStorage->setThirdPartySetting('field_permissions', 'permission_type', FieldPermissionTypeInterface::ACCESS_CUSTOM);
+    $this->fieldStorage->setThirdPartySetting('custom_field_permissions_instance', 'bundles_types_permissions', FieldPermissionTypeInterface::ACCESS_CUSTOM);
     $this->fieldStorage->save();
     $this->drupalGet(Url::fromRoute('field_permissions.reports'));
     $this->assertSession()->statusCodeEquals(200);

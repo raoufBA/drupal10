@@ -101,7 +101,7 @@ class ViewsFieldAccessTest extends ViewsKernelTestBase {
       'type' => 'text',
       'entity_type' => 'entity_test',
     ]);
-    $this->fieldStorage->setThirdPartySetting('field_permissions', 'permission_type', FieldPermissionTypeInterface::ACCESS_PUBLIC);
+    $this->fieldStorage->setThirdPartySetting('custom_field_permissions_instance', 'bundles_types_permissions', FieldPermissionTypeInterface::ACCESS_PUBLIC);
     $this->fieldStorage->save();
     $this->field = FieldConfig::create([
       'field_name' => 'test_field',
@@ -159,7 +159,7 @@ class ViewsFieldAccessTest extends ViewsKernelTestBase {
    * Tests custom permissions.
    */
   public function testCustomPermissions() {
-    $this->fieldStorage->setThirdPartySetting('field_permissions', 'permission_type', FieldPermissionTypeInterface::ACCESS_CUSTOM)->save();
+    $this->fieldStorage->setThirdPartySetting('custom_field_permissions_insance', 'bundles_types_permissions', FieldPermissionTypeInterface::ACCESS_CUSTOM)->save();
     $this->roleWithAccess->grantPermission('view ' . $this->fieldStorage->getName())->save();
     $this->assertFieldAccess();
   }
@@ -168,7 +168,7 @@ class ViewsFieldAccessTest extends ViewsKernelTestBase {
    * Tests private permissions.
    */
   public function testPrivatePermissions() {
-    $this->fieldStorage->setThirdPartySetting('field_permissions', 'permission_type', FieldPermissionTypeInterface::ACCESS_PRIVATE)->save();
+    $this->fieldStorage->setThirdPartySetting('custom_field_permissions_instance', 'bundles_types_permissions', FieldPermissionTypeInterface::ACCESS_PRIVATE)->save();
 
     // First check with the dedicated permission.
     $this->roleWithAccess->grantPermission('access private fields')->save();
@@ -234,7 +234,7 @@ class ViewsFieldAccessTest extends ViewsKernelTestBase {
     $this->setRawContent($renderer->renderRoot($build));
 
     // If this is a public permission, then the no access user can see it too.
-    if ($this->fieldStorage->getThirdPartySetting('field_permissions', 'permission_type') === FieldPermissionTypeInterface::ACCESS_PUBLIC) {
+    if ($this->fieldStorage->getThirdPartySetting('custom_field_permissions_instance', 'bundles_types_permissions') === FieldPermissionTypeInterface::ACCESS_PUBLIC) {
       $this->assertText($field_content);
     }
     else {

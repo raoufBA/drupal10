@@ -4,9 +4,9 @@ services:
     arguments: [ 'custom_field_permissions_instance' ]
   custom_field_permissions_instance.yaml_service:
     class: Symfony\Component\Yaml\Yaml
+  plugin.custom_field_permissions_instance.types.manager:
+    class: Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\Manager
+    parent: default_plugin_manager
   custom_field_permissions_instance.permissions_service:
-    class: Drupal\custom_field_permissions_instance\FieldInstancePermissionsService
-    public: false
-    decorates: field_permissions.permissions_service
-    decoration_priority: 1
-    arguments: ['@entity_type.manager', '@plugin.field_permissions.types.manager', '@custom_field_permissions_instance.yaml_service', '@cache.default', '@logger.channel.custom_field_permissions_instance']
+    class: Drupal\custom_field_permissions_instance\CustomFieldPermissionsService
+    arguments: [ '@entity_type.manager', '@plugin.custom_field_permissions_instance.types.manager', '@custom_field_permissions_instance.yaml_service', '@cache.default', '@logger.channel.custom_field_permissions_instance' ]

@@ -5,8 +5,10 @@ namespace Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\custom_field_permissions_instance\Annotation\CustomFieldPermissionInstanceType;
 use Drupal\custom_field_permissions_instance\Plugin\AdminFormSettingsInterface;
 use Drupal\custom_field_permissions_instance\Plugin\CustomPermissionsInterface;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\RoleStorageInterface;
 use Drupal\user\UserInterface;
@@ -14,7 +16,7 @@ use Drupal\user\UserInterface;
 /**
  * Defines custom access for fields.
  *
- * @FieldPermissionType(
+ * @CustomFieldPermissionInstanceType(
  *   id = "custom",
  *   title = @Translation("Custom permissions"),
  *   description = @Translation("Define custom permissions for this field."),
@@ -70,7 +72,42 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
    * {@inheritdoc}
    */
   public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
+
     $this_plugin_applies = $form_state->getValue('type') === $this->getPluginId();
+    // Récupérer les valeurs du formulaire.
+    $field_name = $this->fieldStorage->getName();
+    $target_entity_type_id = $this->fieldStorage->getTargetEntityTypeId();
+
+
+
+    $instance_permissions = $form_state->getValue('permissions');
+
+    // Charger la configuration du stockage de champ.
+    $this->fieldStorage = FieldStorageConfig::loadByName($target_entity_type_id, $field_name);
+    if (!$this->fieldStorage) {
+      \Drupal::messenger()->addError(t('The field @field_name does not exist.', ['@field_name' => $field_name]));
+      return;
+    }
+    if($this_plugin_applies){
+      $current_config = $this->getConfigPermissions();
+
+      $current_config = array_merge($current_config, $instance_permissions);
+    }else{
+      $current_config=   [];
+    }
+    // Vérifier que le champ supporte les "third_party_settings".
+    if (method_exists($this->fieldStorage, 'setThirdPartySetting')) {
+      // Enregistrer les permissions dans les "third_party_settings".
+      $this->fieldStorage->setThirdPartySetting('custom_field_permissions_instance', 'role_permissions', $current_config);
+      // Charger les permissions.
+      $this->fieldStorage->save();
+
+      \Drupal::messenger()->addMessage(t('Permissions have been saved for the field @field_name.', ['@field_name' => $field_name]));
+    }
+    else {
+      \Drupal::messenger()->addError(t('The field @field_name does not support third party settings.', ['@field_name' => $field_name]));
+    }
+    /*$this_plugin_applies = $form_state->getValue('type') === $this->getPluginId();
     $custom_permissions = $form_state->getValue('permissions');
     $keys = array_keys($custom_permissions);
     $custom_permissions = $this->transposeArray($custom_permissions);
@@ -90,7 +127,15 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
         $role->set('permissions', $permissions);
         $role->trustData()->save();
       }
-    }
+    }*/
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getConfigPermissions(): mixed
+  {
+    return $this->fieldStorage->getThirdPartySetting('custom_field_permissions_instance', 'role_permissions', []);
   }
 
   /**
@@ -118,11 +163,10 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
   public function getPermissions() {
     $permissions = [];
     $field_name = $this->fieldStorage->getName();
-    $permission_list = $this->fieldPermissionsService->getList($field_name);
+    $permission_list = $this->CustomFieldPermissionsService->getList($field_name);
     $perms_name = array_keys($permission_list);
     foreach ($perms_name as $perm_name) {
-      $name = $perm_name . ' ' . $field_name;
-      $permissions[$name] = $permission_list[$perm_name];
+      $permissions[$perm_name] = $permission_list[$perm_name];
     }
     return $permissions;
   }
@@ -158,7 +202,21 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
       ];
     }
 
-    $test = $this->fieldPermissionsService->getPermissionsByRole();
+//    $test = $this->CustomFieldPermissionsService->getPermissionsByRole();
+
+    $field_config = $form_state->getFormObject()->getEntity();
+
+
+    $current_bundle = $field_config->getTargetBundle();
+
+    $lodData = $this->getConfigPermissions();
+    // Ensure we are only working with the current bundle's data.
+    if (!isset($lodData[$current_bundle])) {
+      $lodData[$current_bundle] = [];
+    }
+
+    $lodData = $lodData[$current_bundle];
+
     foreach ($permissions as $provider => $permission) {
       $form['permissions'][$provider]['description'] = [
         '#type' => 'inline_template',
@@ -173,14 +231,19 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
           '#title' => $name . ': ' . $permission["title"],
           '#title_display' => 'invisible',
           '#type' => 'checkbox',
+          '#parents' => ['permissions', $current_bundle, $provider, $name],
           '#attributes' => ['class' => ['rid-' . $name, 'js-rid-' . $name]],
           '#wrapper_attributes' => [
             'class' => ['checkbox'],
           ],
         ];
-        if (!empty($test[$name]) && in_array($provider, $test[$name])) {
-          $form['permissions'][$provider][$name]['#default_value'] = in_array($provider, $test[$name]);
+
+        // Set default values based on existing permissions.
+        if (!empty($lodData[$provider][$name])) {
+          $form['permissions'][$provider][$name]['#default_value'] = in_array($provider, $lodData[$provider]);
         }
+
+
         if ($role->isAdmin()) {
           $form['permissions'][$provider][$name]['#disabled'] = TRUE;
           $form['permissions'][$provider][$name]['#default_value'] = TRUE;

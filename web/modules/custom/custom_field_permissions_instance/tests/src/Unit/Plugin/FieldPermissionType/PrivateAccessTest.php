@@ -5,7 +5,7 @@ namespace Drupal\Tests\field_permissions\Unit\Plugin\FieldPermissionType;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\field\FieldStorageConfigInterface;
-use Drupal\field_permissions\FieldPermissionsService;
+use Drupal\field_permissions\CustomFieldPermissionsService;
 use Drupal\field_permissions\Plugin\FieldPermissionType\PrivateAccess;
 use Drupal\Tests\UnitTestCase;
 use Drupal\user\EntityOwnerInterface;
@@ -37,7 +37,7 @@ class PrivateAccessTest extends UnitTestCase {
     parent::setUp();
 
     $storage = $this->prophesize(FieldStorageConfigInterface::class);
-    $field_permissions_service = $this->prophesize(FieldPermissionsService::class);
+    $field_permissions_service = $this->prophesize(CustomFieldPermissionsService::class);
 
     $this->plugin = new PrivateAccess([], 'private', [], $storage->reveal(), $field_permissions_service->reveal());
   }

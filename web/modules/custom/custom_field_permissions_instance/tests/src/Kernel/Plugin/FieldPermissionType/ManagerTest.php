@@ -55,7 +55,7 @@ class ManagerTest extends KernelTestBase {
     $this->installEntitySchema('user');
     $this->installEntitySchema('entity_test');
 
-    $this->fieldPermissionTypeManager = $this->container->get('plugin.field_permissions.types.manager');
+    $this->fieldPermissionTypeManager = $this->container->get('plugin.custom_field_permissions_instance.types.manager');
     $this->account = $this->createUser(['cancel account']);
   }
 
@@ -105,7 +105,7 @@ class ManagerTest extends KernelTestBase {
    */
   public function testAppliesToField(): void {
     $state = $this->container->get('state');
-    $service = $this->container->get('field_permissions.permissions_service');
+    $service = $this->container->get('custom_field_permissions_instance.permissions_service');
 
     FieldStorageConfig::create([
       'type' => 'string',

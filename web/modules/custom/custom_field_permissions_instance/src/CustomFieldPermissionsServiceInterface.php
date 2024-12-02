@@ -10,7 +10,7 @@ use Drupal\Core\Session\AccountInterface;
 /**
  * Implement FieldPermission Interface.
  */
-interface FieldPermissionsServiceInterface {
+interface CustomFieldPermissionsServiceInterface {
 
   /**
    * Obtain the list of field permissions.
@@ -53,10 +53,12 @@ interface FieldPermissionsServiceInterface {
   /**
    * Get the permission type for a given field.
    *
-   * @param \Drupal\Core\Field\FieldStorageDefinitionInterface $field
+   * @param FieldStorageDefinitionInterface $field
    *   The field to return permissions for.
+   * @param string $current_bundle
+   *   The current Bundle.
    */
-  public function fieldGetPermissionType(FieldStorageDefinitionInterface $field);
+  public function fieldGetPermissionType(FieldStorageDefinitionInterface $field, string $current_bundle);
 
   /**
    * Field is attached to comment entity.
