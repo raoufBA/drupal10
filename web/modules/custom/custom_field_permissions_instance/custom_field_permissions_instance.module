@@ -66,6 +66,7 @@ function custom_field_permissions_instance_jsonapi_entity_field_filter_access(Fi
     return AccessResult::neutral();
   }
   dump($field_definition);
+  exit();
 
   /** @var \Drupal\custom_field_permissions_instance\CustomFieldPermissionsServiceInterface $service */
   $service = \Drupal::service('custom_field_permissions_instance.permissions_service');

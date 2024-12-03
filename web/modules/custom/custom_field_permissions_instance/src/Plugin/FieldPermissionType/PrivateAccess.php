@@ -13,8 +13,8 @@ use Drupal\user\UserInterface;
  * @CustomFieldPermissionInstanceType(
  *   id = "private",
  *   title = @Translation("Private"),
- *   description = @Translation("Only author and administrators can edit and view."),
- *   weight = 25
+ *   description = @Translation("Only author and administrators can edit and
+ *   view."), weight = 25
  * )
  */
 class PrivateAccess extends Base {
@@ -24,12 +24,12 @@ class PrivateAccess extends Base {
    */
   public function hasFieldAccess($operation, EntityInterface $entity, AccountInterface $account) {
     if ($account->hasPermission('access private fields')) {
-      return TRUE;
+      return true;
     }
 
     // Users can access the field when creating new entities.
     if ($entity->isNew()) {
-      return TRUE;
+      return true;
     }
 
     // Special handling for 'user' entities.
@@ -40,13 +40,13 @@ class PrivateAccess extends Base {
       return $entity->getOwnerId() === $account->id();
     }
 
-    return TRUE;
+    return true;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function hasFieldViewAccessForEveryEntity(AccountInterface $account) {
+  public function hasFieldViewAccessForEveryEntity(AccountInterface $account): bool {
     return $account->hasPermission('access private fields');
   }
 

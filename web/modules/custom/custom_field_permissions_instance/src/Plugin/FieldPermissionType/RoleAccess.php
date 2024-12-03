@@ -8,7 +8,6 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\custom_field_permissions_instance\Annotation\CustomFieldPermissionInstanceType;
 use Drupal\custom_field_permissions_instance\Plugin\AdminFormSettingsInterface;
 use Drupal\custom_field_permissions_instance\Plugin\CustomPermissionsInterface;
-use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\RoleStorageInterface;
 use Drupal\user\UserInterface;
@@ -25,40 +24,58 @@ use Drupal\user\UserInterface;
  */
 class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSettingsInterface {
 
+  const KEY_CONFIG_PERMISSIONS = 'role_permissions';
+
+  const FORM_ID = 'permissions';
+
   /**
    * {@inheritdoc}
    */
   public function hasFieldAccess($operation, EntityInterface $entity, AccountInterface $account) {
-    assert(in_array($operation, ["edit", "view"]), 'The operation is either "edit" or "view", "' . $operation . '" given instead.');
+    assert(in_array($operation, [
+      "edit",
+      "view",
+    ]), 'The operation is either "edit" or "view", "' . $operation . '" given instead.');
 
-    $field_name = $this->fieldStorage->getName();
-    if ($operation === 'edit' && $entity->isNew()) {
-      return $account->hasPermission('create ' . $field_name);
+    $configPermission = $this->getConfigPermissions(self::KEY_CONFIG_PERMISSIONS);
+    $bundle = $entity->bundle();
+
+    if (!isset($configPermission[$bundle])) {
+      return true;
     }
-    if ($account->hasPermission($operation . ' ' . $field_name)) {
-      return TRUE;
+
+    $permissions = $configPermission[$bundle];
+
+    $entity_permissions = $permissions;
+
+    if ($operation === 'edit' && $entity->isNew()) {
+      return $this->UserHasPermission($account, $entity_permissions[$operation]);
+    }
+
+    if ($this->UserHasPermission($account, $entity_permissions[$operation])) {
+      return true;
     }
     else {
       // User entities don't implement `EntityOwnerInterface`.
       if ($entity instanceof UserInterface) {
-        return $entity->id() == $account->id() && $account->hasPermission($operation . ' own ' . $field_name);
+        return $entity->id() == $account->id() && $this->UserHasPermission($account, $entity_permissions[$operation . ' own']);
       }
       elseif ($entity instanceof EntityOwnerInterface) {
-        return $entity->getOwnerId() === $account->id() && $account->hasPermission($operation . ' own ' . $field_name);
+        return $entity->getOwnerId() === $account->id() && $this->UserHasPermission($account, $entity_permissions[$operation . ' own']);
       }
     }
-
     // Default to deny since access can be explicitly granted (edit field_name),
     // even if this entity type doesn't implement the EntityOwnerInterface.
-    return FALSE;
+    return false;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function hasFieldViewAccessForEveryEntity(AccountInterface $account) {
-    $field_name = $this->fieldStorage->getName();
-    return $account->hasPermission('view ' . $field_name);
+  public function hasFieldViewAccessForEveryEntity(AccountInterface $account): bool {
+    return false;
+    //    $field_name = $this->fieldStorage->getName();
+    //    return $account->hasPermission('view ' . $field_name);
   }
 
   /**
@@ -66,109 +83,6 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
    */
   public function buildAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
     $this->addPermissionsGrid($form, $form_state, $role_storage);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function submitAdminForm(array &$form, FormStateInterface $form_state, RoleStorageInterface $role_storage) {
-
-    $this_plugin_applies = $form_state->getValue('type') === $this->getPluginId();
-    // Récupérer les valeurs du formulaire.
-    $field_name = $this->fieldStorage->getName();
-    $target_entity_type_id = $this->fieldStorage->getTargetEntityTypeId();
-
-
-
-    $instance_permissions = $form_state->getValue('permissions');
-
-    // Charger la configuration du stockage de champ.
-    $this->fieldStorage = FieldStorageConfig::loadByName($target_entity_type_id, $field_name);
-    if (!$this->fieldStorage) {
-      \Drupal::messenger()->addError(t('The field @field_name does not exist.', ['@field_name' => $field_name]));
-      return;
-    }
-    if($this_plugin_applies){
-      $current_config = $this->getConfigPermissions();
-
-      $current_config = array_merge($current_config, $instance_permissions);
-    }else{
-      $current_config=   [];
-    }
-    // Vérifier que le champ supporte les "third_party_settings".
-    if (method_exists($this->fieldStorage, 'setThirdPartySetting')) {
-      // Enregistrer les permissions dans les "third_party_settings".
-      $this->fieldStorage->setThirdPartySetting('custom_field_permissions_instance', 'role_permissions', $current_config);
-      // Charger les permissions.
-      $this->fieldStorage->save();
-
-      \Drupal::messenger()->addMessage(t('Permissions have been saved for the field @field_name.', ['@field_name' => $field_name]));
-    }
-    else {
-      \Drupal::messenger()->addError(t('The field @field_name does not support third party settings.', ['@field_name' => $field_name]));
-    }
-    /*$this_plugin_applies = $form_state->getValue('type') === $this->getPluginId();
-    $custom_permissions = $form_state->getValue('permissions');
-    $keys = array_keys($custom_permissions);
-    $custom_permissions = $this->transposeArray($custom_permissions);
-    foreach ($role_storage->loadMultiple() as $role) {
-      $permissions = $role->getPermissions();
-      $removed = array_values(array_intersect($permissions, $keys));
-      $added = $this_plugin_applies ? array_keys(array_filter($custom_permissions[$role->id()])) : [];
-      // Permissions in role object are sorted on save. Permissions on form are
-      // not in same order (the 'any' and 'own' items are flipped) but need to
-      // be as array equality tests keys and values. So sort the added items.
-      sort($added);
-      if ($removed != $added) {
-        // Rule #1 Do NOT save something that is not changed.
-        // Like field storage, delete existing items then add current items.
-        $permissions = array_diff($permissions, $removed);
-        $permissions = array_merge($permissions, $added);
-        $role->set('permissions', $permissions);
-        $role->trustData()->save();
-      }
-    }*/
-  }
-
-  /**
-   * @return mixed
-   */
-  public function getConfigPermissions(): mixed
-  {
-    return $this->fieldStorage->getThirdPartySetting('custom_field_permissions_instance', 'role_permissions', []);
-  }
-
-  /**
-   * Transposes a 2-dimensional array.
-   *
-   * @param array $original
-   *   The array to transpose.
-   *
-   * @return array
-   *   The transposed array.
-   */
-  protected function transposeArray(array $original) {
-    $transpose = [];
-    foreach ($original as $row => $columns) {
-      foreach ($columns as $column => $value) {
-        $transpose[$column][$row] = $value;
-      }
-    }
-    return $transpose;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getPermissions() {
-    $permissions = [];
-    $field_name = $this->fieldStorage->getName();
-    $permission_list = $this->CustomFieldPermissionsService->getList($field_name);
-    $perms_name = array_keys($permission_list);
-    foreach ($perms_name as $perm_name) {
-      $permissions[$perm_name] = $permission_list[$perm_name];
-    }
-    return $permissions;
   }
 
   /**
@@ -193,7 +107,7 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
       '#header' => [$this->t('Permission')],
       '#id' => 'permissions',
       '#attributes' => ['class' => ['permissions', 'js-permissions']],
-      '#sticky' => TRUE,
+      '#sticky' => true,
     ];
     foreach ($roles as $role) {
       $form['permissions']['#header'][] = [
@@ -202,14 +116,11 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
       ];
     }
 
-//    $test = $this->CustomFieldPermissionsService->getPermissionsByRole();
-
     $field_config = $form_state->getFormObject()->getEntity();
-
 
     $current_bundle = $field_config->getTargetBundle();
 
-    $lodData = $this->getConfigPermissions();
+    $lodData = $this->getConfigPermissions(self::KEY_CONFIG_PERMISSIONS);
     // Ensure we are only working with the current bundle's data.
     if (!isset($lodData[$current_bundle])) {
       $lodData[$current_bundle] = [];
@@ -243,10 +154,9 @@ class RoleAccess extends Base implements CustomPermissionsInterface, AdminFormSe
           $form['permissions'][$provider][$name]['#default_value'] = in_array($provider, $lodData[$provider]);
         }
 
-
         if ($role->isAdmin()) {
-          $form['permissions'][$provider][$name]['#disabled'] = TRUE;
-          $form['permissions'][$provider][$name]['#default_value'] = TRUE;
+          $form['permissions'][$provider][$name]['#disabled'] = true;
+          $form['permissions'][$provider][$name]['#default_value'] = true;
         }
       }
     }

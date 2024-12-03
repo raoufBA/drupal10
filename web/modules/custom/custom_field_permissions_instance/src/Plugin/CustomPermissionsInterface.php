@@ -13,6 +13,6 @@ interface CustomPermissionsInterface {
    * @return array
    *   An array of permissions.
    */
-  public function getPermissions();
+  public function getPermissions(): array;
 
 }

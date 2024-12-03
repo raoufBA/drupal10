@@ -87,7 +87,7 @@ class CustomFieldPermissionsService implements CustomFieldPermissionsServiceInte
   /**
    * {@inheritdoc}
    */
-  public static function getList($field_label = '') {
+  public static function getList($field_label = ''){
     return [
       'create' => [
         'label' => t('Create field'),
@@ -197,7 +197,7 @@ class CustomFieldPermissionsService implements CustomFieldPermissionsServiceInte
    * {@inheritdoc}
    */
   public function getFieldAccess($operation, FieldItemListInterface $items, AccountInterface $account, FieldDefinitionInterface $field_definition) {
-    $permission_type = $this->fieldGetPermissionType($field_definition->getFieldStorageDefinition());
+    $permission_type = $this->fieldGetPermissionType($field_definition->getFieldStorageDefinition(), $field_definition->getTargetBundle());
     if (in_array('administrator', $account->getRoles()) || $permission_type == FieldPermissionTypeInterface::ACCESS_PUBLIC) {
       return TRUE;
     }

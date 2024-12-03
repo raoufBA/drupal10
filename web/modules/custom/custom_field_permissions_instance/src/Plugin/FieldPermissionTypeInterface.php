@@ -28,24 +28,24 @@ interface FieldPermissionTypeInterface extends PluginInspectionInterface, Deriva
    * Private fields are never displayed, and are only editable by the author
    * (and by site administrators with the 'access private fields' permission).
    *
+   * @see \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\PrivateAccess
    * @internal
    *
    * This is here as a helper since there are still special handling of the
    * various plugins throughout this module.
    *
-   * @see \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\PrivateAccess
    */
   const ACCESS_PRIVATE = 'private';
 
   /**
    * Indicates that a field is using the custom permission type.
    *
+   * @see \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\RoleAccess
    * @internal
    *
    * This is here as a helper since there are still special handling of the
    * various plugins throughout this module.
    *
-   * @see \Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType\RoleAccess
    */
   const ACCESS_CUSTOM = 'custom';
 
@@ -79,6 +79,18 @@ interface FieldPermissionTypeInterface extends PluginInspectionInterface, Deriva
    *   The access result.
    */
   public function hasFieldAccess($operation, EntityInterface $entity, AccountInterface $account);
+
+  /**
+   * Determine if access to the field is granted for a given account for every
+   * entity.
+   *
+   * @param \Drupal\Core\Session\AccountInterface $account
+   * The user to check access for.
+   *
+   * @return bool
+   * The access result.
+   */
+  public function hasFieldViewAccessForEveryEntity(AccountInterface $account): bool;
 
   /**
    * Checks whether this plugin can be applied to a certain field.

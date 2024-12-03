@@ -32,6 +32,17 @@ interface CustomFieldPermissionsServiceInterface {
   public static function getList($field_label = '');
 
   /**
+   * Field is attached to comment entity.
+   *
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
+   *   Fields to get permissions.
+   *
+   * @return bool
+   *   TRUE if in a comment entity.
+   */
+  public static function isCommentField(FieldDefinitionInterface $field_definition);
+
+  /**
    * Get all field permissions keyed by role ID.
    *
    * @return array
@@ -59,17 +70,6 @@ interface CustomFieldPermissionsServiceInterface {
    *   The current Bundle.
    */
   public function fieldGetPermissionType(FieldStorageDefinitionInterface $field, string $current_bundle);
-
-  /**
-   * Field is attached to comment entity.
-   *
-   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
-   *   Fields to get permissions.
-   *
-   * @return bool
-   *   TRUE if in a comment entity.
-   */
-  public static function isCommentField(FieldDefinitionInterface $field_definition);
 
   /**
    * Get access for field by operations and account permissions.

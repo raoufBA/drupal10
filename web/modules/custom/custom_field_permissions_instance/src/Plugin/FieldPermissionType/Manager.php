@@ -2,6 +2,7 @@
 
 namespace Drupal\custom_field_permissions_instance\Plugin\FieldPermissionType;
 
+use Drupal;
 use Drupal\Component\Plugin\Factory\DefaultFactory;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
@@ -28,7 +29,7 @@ class Manager extends DefaultPluginManager {
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler to invoke the alter hook with.
    */
-  public function __construct(\Traversable $namespaces, CacheBackendInterface $cache_backend, ModuleHandlerInterface $module_handler) {
+  public function __construct(Traversable $namespaces, CacheBackendInterface $cache_backend, ModuleHandlerInterface $module_handler) {
     parent::__construct('Plugin/FieldPermissionType', $namespaces, $module_handler, FieldPermissionTypeInterface::class, CustomFieldPermissionInstanceType::class);
     $this->setCacheBackend($cache_backend, 'field_permission_type_plugins');
     $this->alterInfo('field_permission_type_plugin');
@@ -50,13 +51,13 @@ class Manager extends DefaultPluginManager {
    * @throws \Drupal\Component\Plugin\Exception\PluginException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
-  public function createInstance($plugin_id, array $configuration = [], FieldStorageDefinitionInterface $field_storage = NULL) {
+  public function createInstance($plugin_id, array $configuration = [], FieldStorageDefinitionInterface $field_storage = null) {
     $plugin_definition = $this->getDefinition($plugin_id);
     $plugin_class = DefaultFactory::getPluginClass($plugin_id, $plugin_definition);
     // If the plugin provides a factory method, pass the container to it.
     if (is_subclass_of($plugin_class, ContainerFactoryPluginInterface::class)) {
       // @phpstan-ignore-next-line
-      $plugin = $plugin_class::create(\Drupal::getContainer(), $configuration, $plugin_id, $plugin_definition, $field_storage);
+      $plugin = $plugin_class::create(Drupal::getContainer(), $configuration, $plugin_id, $plugin_definition, $field_storage);
     }
     else {
       $plugin = new $plugin_class($configuration, $plugin_id, $plugin_definition, $field_storage);
@@ -68,12 +69,11 @@ class Manager extends DefaultPluginManager {
   /**
    * {@inheritdoc}
    */
-  public function getDefinitions(): ?array
-  {
+  public function getDefinitions(): ?array {
     $definitions = parent::getDefinitions();
 
     // Order by weight.
-    uasort($definitions, function ($a, $b) {
+    uasort($definitions, function($a, $b) {
       if ($a['weight'] == $b['weight']) {
         return 0;
       }
